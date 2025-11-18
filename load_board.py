@@ -3,6 +3,7 @@ from board_objects import Domino, Region, Board
 from pathlib import Path
 import random
 from datetime import datetime
+from simulated_annealing import solve_pips
 
 # directory that contains the puzzle JSON files
 BOARDS_DIR = Path("all_boards")
@@ -72,12 +73,12 @@ def get_random_pips_game():
         data = json.load(f)
 
     available = [
-        d for d in ["hard"]
+        d for d in ["easy", "medium", "hard"]
         if d in data and is_valid_section(data[d])
     ]
 
     if not available:
-        raise ValueError(f"No valid difficulties found in {chosen_file}")
+        get_random_pips_game()
 
     chosen_difficulty = random.choice(available)
     print(f"Selected:", chosen_file.name, chosen_difficulty)
@@ -85,3 +86,11 @@ def get_random_pips_game():
     return parse_pips_json(chosen_file, chosen_difficulty)
 
 puzzle = get_random_pips_game()
+solution = solve_pips(puzzle)
+
+if solution:
+    print("Solved!")
+    for cell, value in sorted(solution.items()):
+        print(cell, value)
+else:
+    print("No solution found.")
