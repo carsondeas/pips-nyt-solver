@@ -1,18 +1,13 @@
-# Byte-code files
 *.pyc
 __pycache__/
 
-# Virtual environment
 venv/
 .venv/
 
-# Installer logs
 pip-log.txt
 pip-delete-this-directory.txt
 
-# Editor/IDE-specific files (optional)
 .vscode/
 .idea/
 
-# Environment variables file (optional)
 .env
