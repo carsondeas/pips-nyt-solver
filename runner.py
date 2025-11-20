@@ -27,7 +27,7 @@ def load_board_from_args(args):
         if not path.exists():
             raise FileNotFoundError(f"File not found: {args.file}")
         return parse_pips_json(path, difficulty=args.difficulty)
-    return get_random_pips_game()
+    return get_random_pips_game(difficulty=args.difficulty)
 
 
 def main():

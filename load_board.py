@@ -55,8 +55,11 @@ def parse_pips_json(path, difficulty="easy"):
     return Board(dominoes, regions)
 
 
-def get_random_pips_game():
-    """pick a random puzzle file within the date range and load it."""
+def get_random_pips_game(difficulty=None):
+    """pick a random puzzle file within the date range and load it.
+
+    If difficulty is provided, try to use that section; otherwise pick any available.
+    """
     eligible_files = []
 
     for file in BOARDS_DIR.glob("*.json"):
@@ -71,15 +74,16 @@ def get_random_pips_game():
     with open(chosen_file, "r") as f:
         data = json.load(f)
 
-    available = [
-        d for d in ["easy", "medium", "hard"]
-        if d in data and is_valid_section(data[d])
-    ]
+    available = [d for d in ["easy", "medium", "hard"] if d in data and is_valid_section(data[d])]
 
-    if not available:
-        return get_random_pips_game()
-
-    chosen_difficulty = random.choice(available)
+    if difficulty:
+        if difficulty not in available:
+            raise FileNotFoundError(f"No data for difficulty {difficulty} in {chosen_file}")
+        chosen_difficulty = difficulty
+    else:
+        if not available:
+            return get_random_pips_game()
+        chosen_difficulty = random.choice(available)
     print(f"Selected:", chosen_file.name, chosen_difficulty)
 
     return parse_pips_json(chosen_file, chosen_difficulty)
