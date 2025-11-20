@@ -28,6 +28,31 @@ def region_ok_partial(region, values):
 
     return True
 
+# similar to region_ok_partial but for full placements
+def region_ok_full(region, values):
+    t = region.type
+    target = region.target
+
+    if t == "empty":
+        return True
+
+    if t == "equals":
+        return len(set(values)) == 1
+
+    if t == "notequals":
+        return len(values) == len(set(values))
+
+    if t == "less":
+        return all(v < target for v in values)
+
+    if t == "greater":
+        return all(v > target for v in values)
+
+    if t == "sum":
+        return sum(values) == target
+
+    return True
+
 
 def solve_pips(board):
     R, C = board.rows, board.cols
@@ -38,7 +63,7 @@ def solve_pips(board):
     # only cells that belong to the puzzle are valid; the bounding box may include holes
     valid_cells = set(region_map.keys())
 
-    # generate all domino placements
+    # generate all domino placements restricted to valid cells
     def generate_domino_placements(domino):
         a, b = domino.values
         placements = []
@@ -99,14 +124,19 @@ def solve_pips(board):
         # cell 1 check
         reg1 = region_cells.get(c1)
         if reg1:
-            vals = [grid[c] for c in reg1.cells if c in grid] + [v1]
+            vals = [grid[c] for c in reg1.cells if c in grid]
+            vals.append(v1)
+            # if both halves share the same region, include the second value
+            if reg1 is region_cells.get(c2):
+                vals.append(v2)
             if not region_ok_partial(reg1, vals):
                 return False
 
         # cell 2 check
         reg2 = region_cells.get(c2)
-        if reg2:
-            vals = [grid[c] for c in reg2.cells if c in grid] + [v2]
+        if reg2 and reg2 is not reg1:
+            vals = [grid[c] for c in reg2.cells if c in grid]
+            vals.append(v2)
             if not region_ok_partial(reg2, vals):
                 return False
 
@@ -151,8 +181,15 @@ def solve_pips(board):
             remaining_domains[idx].extend(items)
 
 
-    def dfs():
+    def dfs(valid_cells=valid_cells):
         if all(used):
+            # ensure complete coverage and all regions satisfied
+            if len(grid) != len(valid_cells) or set(grid.keys()) != valid_cells:
+                return False
+            for region in regions:
+                vals = [grid[c] for c in region.cells]
+                if not region_ok_full(region, vals):
+                    return False
             return True
 
         d = select_domino()
@@ -193,7 +230,5 @@ def solve_pips(board):
 
     # start dfs
     if dfs():
-        # ensure every puzzle cell is covered exactly once
-        if len(grid) == len(valid_cells) and set(grid.keys()) == valid_cells:
-            return grid
+        return grid
     return None
