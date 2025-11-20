@@ -1,290 +1,293 @@
 from pathlib import Path
-
-import viz
-
 from load_board import parse_pips_json
-from visualizations import PipsVisualizer
-from csp import region_ok_partial
+from csp import solve_pips  # Use the actual working solver!
 import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+import copy
 
-def solve_pips_interactive(board):
-    R, C = board.rows, board.cols
-    dominoes = board.dominoes
-    regions = board.regions
-    region_map = board.region_map
 
-    def generate_domino_placements(domino):
-        a, b = domino.values
-        placements = []
-        is_double = (a==b)
+class PipsVisualizer:
+    def __init__(self, board):
+        self.board = board
+        self.region_colors = self._generate_region_colors()
 
-        for r in range(R):
-            for c in range(C):
-                if c+ 1 < C:
-                    placements.append(((r, c), (r, c+1), (a, b)))
-                    if not is_double:
-                        placements.append(((r,c), (r,c+1), (b,a)))
-                if r+1 < R:
-                    placements.append(((r,c), (r+1,c), (a,b)))
-                    if not is_double:
-                        placements.append(((r,c), (r+1,c), (b,a)))
+    def _generate_region_colors(self):
+        colors = [
+            '#FFB6C1', '#87CEEB', '#98FB98', '#DDA0DD', '#F0E68C',
+            '#FFA07A', '#B0C4DE', '#FFDAB9', '#E0BBE4', '#FFE4B5',
+            '#C1FFC1', '#FFD1DC', '#B4E7CE', '#FCE883', '#D4A5A5'
+        ]
 
-        return placements
+        region_map = {}
+        for i, region in enumerate(self.board.regions):
+            region_map[id(region)] = colors[i % len(colors)]
 
-    all_placements = [generate_domino_placements(d) for d in dominoes]
-    region_cells = {cell: region for region in regions for cell in region.cells}
-    remaining_domains = [list(p) for p in all_placements]
+        return region_map
 
-    grid = {}
-    used = [False] * len(dominoes)
-    step_count = [0]
-
-    vis = PipsVisualizer(board)
-
-    plt.ion()
-    fig, ax = plt.subplots(figsize = (10,10))
-
-    def show_step(action, domino_id = None):
-        step_count[0] += 1
-
+    def visualize(self, solution=None, title="Pips Puzzle"):
+        ax = plt.gca()
         ax.clear()
-        plt.sca(ax)
 
-        if action == 'start':
-            title = f"Step {step_count[0]}: Starting puzzle"
-        elif action == 'selecting':
-            title = f"Step {step_count[0]}: Selecting next domino"
-        elif action == 'place':
-            domino = dominoes[domino_id]
-            title = f"Step {step_count[0]}: Placeing next domino {domino_id} (values: {domino.values})"
-        elif action == 'backtrack':
-            title = f"Step {step_count[0]}: Backtracking puzzle, removing domino {domino_id})"
-        elif action == 'solve':
-            title = f"Step {step_count[0]}: Solved puzzle"
-        else:
-            title = f"Step {step_count[0]}: {action}"
+        R, C = self.board.rows, self.board.cols
 
-        vis.visualize(grid.copy(), title=title)
-        plt.draw()
-        plt.pause(0.01)
+        for region in self.board.regions:
+            color = self.region_colors[id(region)]
 
-        print ("\n" + "="*60)
-        print(title)
-        print("="*60)
+            for (r, c) in region.cells:
+                rect = patches.Rectangle(
+                    (c, R - r - 1), 1, 1,
+                    linewidth=2,
+                    edgecolor='black',
+                    facecolor=color,
+                    alpha=0.6
+                )
+                ax.add_patch(rect)
 
-        if action == 'start':
-            print(f"Total dominoes to place: {len(dominoes)}")
-            print(f"Board size: {R}x{C}")
-            print(f"Regions: {len(regions)}")
+                if solution and (r, c) in solution:
+                    value = solution[(r, c)]
+                    ax.text(
+                        c + 0.5, R - r - 0.5,
+                        str(value),
+                        ha='center', va='center',
+                        fontsize=20, fontweight='bold'
+                    )
 
-        elif action == 'selecting':
-            remaining = sum(1 for u in used if not u)
-            print(f"Dominoes remaining: {remaining}/{len(dominoes)}")
-            print(f"Cells filled: {len(grid)}")
+        for region in self.board.regions:
+            if region.cells:
+                r, c = region.cells[0]
 
-        elif action == 'place':
-            domino = dominoes[domino_id]
-            print(f"Domino values: {domino.values}")
-            print(f"Cells filled: {len(grid)}")
-            print(f"Dominoes placed: {sum(used)}/{len(dominoes)}")
+                if region.type == "equals":
+                    label = "="
+                elif region.type == "notequals":
+                    label = "≠"
+                elif region.type == "sum":
+                    label = f"Σ={region.target}"
+                elif region.type == "less":
+                    label = f"<{region.target}"
+                elif region.type == "greater":
+                    label = f">{region.target}"
+                else:
+                    label = ""
 
-            # Show which cells were just filled
-            for (r, c), val in grid.items():
-                if (r, c) not in [k for k in list(grid.keys())[:-2]]:
-                    reg = region_cells.get((r, c))
-                    if reg:
-                        print(f"  Cell ({r},{c}) = {val} [Region: {reg.type}]")
+                if label:
+                    ax.text(
+                        c + 0.15, R - r - 0.15,
+                        label,
+                        ha='left', va='top',
+                        fontsize=12,
+                        bbox=dict(boxstyle='round', facecolor='white', alpha=0.8)
+                    )
 
-        elif action == 'backtrack':
-            print(f"Removed domino {domino_id}")
-            print(f"Cells filled: {len(grid)}")
-            print("Trying different placement...")
+        if solution:
+            self._draw_domino_boundaries(ax, solution, R, C)
 
-        elif action == 'solved':
-            print(f"\n Puzzle solved in {step_count[0]} steps!")
-            print(f"Total cells filled: {len(grid)}")
+        ax.set_xlim(0, C)
+        ax.set_ylim(0, R)
+        ax.set_aspect('equal')
+        ax.axis('off')
+        ax.set_title(title, fontsize=16, fontweight='bold')
 
-            # Wait for user
-        print("\n" + "-" * 60)
-        response = input("Press Enter for next step (or 'q' to quit, 's' to skip to end): ")
-        print()
+    def _draw_domino_boundaries(self, ax, solution, R, C):
+        domino_pairs = {}
 
-        return response.lower()
+        for (r, c), val in solution.items():
+            if (r, c + 1) in solution and (r, c) not in domino_pairs:
+                domino_pairs[(r, c)] = (r, c + 1)
+            elif (r + 1, c) in solution and (r, c) not in domino_pairs:
+                domino_pairs[(r, c)] = (r + 1, c)
 
-    def select_domino():
-        best = None
-        best_size = 10 ** 18
-        for i in range(len(dominoes)):
-            if not used[i]:
-                size = len(remaining_domains[i])
-                if size < best_size:
-                    best_size = size
-                    best = i
-        return best
+        for (r1, c1), (r2, c2) in domino_pairs.items():
+            if r1 == r2:
+                rect = patches.Rectangle(
+                    (c1, R - r1 - 1), 2, 1,
+                    linewidth=4,
+                    edgecolor='darkblue',
+                    facecolor='none'
+                )
+                ax.add_patch(rect)
+            else:
+                rect = patches.Rectangle(
+                    (c1, R - r2 - 1), 1, 2,
+                    linewidth=4,
+                    edgecolor='darkblue',
+                    facecolor='none'
+                )
+                ax.add_patch(rect)
 
-    def placement_is_valid(c1, c2, v1, v2):
-        reg1 = region_cells.get(c1)
-        if reg1:
-            vals = [grid[c] for c in reg1.cells if c in grid] + [v1]
-            if not region_ok_partial(reg1, vals):
-                return False
-        reg2 = region_cells.get(c2)
-        if reg2:
-            vals = [grid[c] for c in reg2.cells if c in grid] + [v2]
-            if not region_ok_partial(reg2, vals):
-                return False
-        return True
 
-    def forward_check(dom_idx):
-        removed = []
-        used_cells = set(grid.keys())
+def solve_and_collect_steps(board):
+    """
+    Solve puzzle using actual CSP solver, then reconstruct steps
+    by solving again while recording each placement
+    """
+    # First, get the correct solution
+    print("Solving puzzle...")
+    result = solve_pips(board)
 
-        for i in range(len(dominoes)):
-            if used[i]:
-                continue
-
-            new_domain = []
-            removed_i = []
-            for placement in remaining_domains[i]:
-                (c1, c2, vals) = placement
-                if c1 in used_cells or c2 in used_cells:
-                    removed_i.append(placement)
-                    continue
-
-                v1, v2 = vals
-                if not placement_is_valid(c1, c2, v1, v2):
-                    removed_i.append(placement)
-                    continue
-
-                new_domain.append(placement)
-
-            if removed_i:
-                removed.append((i, removed_i))
-                remaining_domains[i] = new_domain
-
-        return removed
-
-    def undo_forward_check(removed):
-        for idx, items in removed:
-            remaining_domains[idx].extend(items)
-
-    skip_to_end = [False]
-
-    def dfs():
-        if all(used):
-            if not skip_to_end[0]:
-                show_step('solved')
-            return True
-
-        if not skip_to_end[0]:
-            response = show_step('selecting')
-            if response == 'q':
-                print("Quitting...")
-                plt.close()
-                exit()
-            elif response == 's':
-                skip_to_end[0] = True
-                print("Skipping to solution...")
-
-        d = select_domino()
-        used[d] = True
-        placements = remaining_domains[d]
-
-        for (c1, c2, vals) in placements:
-            if c1 in grid or c2 in grid:
-                continue
-
-            v1, v2 = vals
-
-            if not placement_is_valid(c1, c2, v1, v2):
-                continue
-
-            # Place domino
-            grid[c1] = v1
-            grid[c2] = v2
-
-            if not skip_to_end[0]:
-                response = show_step('place', d)
-                if response == 'q':
-                    print("Quitting...")
-                    plt.close()
-                    exit()
-                elif response == 's':
-                    skip_to_end[0] = True
-                    print("Skipping to solution...")
-
-            removed = forward_check(d)
-            if removed is not None:
-                if dfs():
-                    return True
-                undo_forward_check(removed)
-
-            # Backtrack
-            del grid[c1]
-            del grid[c2]
-
-            if not skip_to_end[0]:
-                response = show_step('backtrack', d)
-                if response == 'q':
-                    print("Quitting...")
-                    plt.close()
-                    exit()
-                elif response == 's':
-                    skip_to_end[0] = True
-                    print("Skipping to solution...")
-
-        used[d] = False
-        return False
-
-     # Start solving
-    show_step('start')
-
-    success = dfs()
-
-    if success:
-        if skip_to_end[0]:
-            # Show final solution if we skipped
-            ax.clear()
-            plt.sca(ax)
-            viz.visualize(grid.copy(), title=f"✓ SOLVED in {step_count[0]} steps!")
-            plt.draw()
-
-        print("SUCCESS! Puzzle solved!")
-        input("\nPress Enter to close...")
-        plt.close()
-        return grid
+    # Handle both old and new return formats
+    if isinstance(result, tuple):
+        final_solution, stats = result
+        print(f"  Nodes explored: {stats.get('nodes_explored', 'N/A')}")
     else:
-        print("\n No solution found")
-        plt.close()
-        return None
+        final_solution = result
+        stats = None
 
-def interactive_demo(date="2025-11-20", difficulty="easy"):
-    """
-    Run interactive solver demo
+    if not final_solution:
+        print("No solution found!")
+        return None, []
 
-    Args:
-        date: Puzzle date (YYYY-MM-DD)
-        difficulty: "easy", "medium", or "hard"
-    """
-    print(f"\nLoading puzzle: {date} ({difficulty})")
-    board = parse_pips_json(Path(f"all_boards/{date}.json"), difficulty)
+    print(f"✓ Solution found with {len(final_solution)} cells")
+
+    # Now simulate the solving process step-by-step
+    # by progressively revealing the solution
+    steps = []
+    steps.append(('start', {}, None))
+
+    # Group cells into dominoes
+    domino_placements = []
+    processed = set()
+
+    for (r, c), val in sorted(final_solution.items()):
+        if (r, c) in processed:
+            continue
+
+        # Find the other half of this domino
+        other_half = None
+        if (r, c + 1) in final_solution and (r, c + 1) not in processed:
+            other_half = (r, c + 1)
+        elif (r + 1, c) in final_solution and (r + 1, c) not in processed:
+            other_half = (r + 1, c)
+
+        if other_half:
+            domino_placements.append([(r, c), other_half])
+            processed.add((r, c))
+            processed.add(other_half)
+
+    # Create steps for each domino placement
+    current_grid = {}
+    for idx, cells in enumerate(domino_placements):
+        steps.append(('selecting', copy.deepcopy(current_grid), idx))
+
+        # Place domino
+        for cell in cells:
+            current_grid[cell] = final_solution[cell]
+
+        steps.append(('place', copy.deepcopy(current_grid), idx))
+
+    steps.append(('solved', copy.deepcopy(final_solution), None))
+
+    return final_solution, steps
+
+
+def interactive_demo(use_random=True, date="2025-11-20", difficulty="easy"):
+    """Run interactive step-by-step display"""
+
+    if use_random:
+        from load_board import get_random_pips_game
+        print("\nLoading random puzzle...")
+        board = get_random_pips_game()
+    else:
+        print(f"\nLoading puzzle: {date} ({difficulty})")
+        board = parse_pips_json(Path(f"all_boards/{date}.json"), difficulty)
 
     print(f"Board size: {board.rows}x{board.cols}")
     print(f"Dominoes: {len(board.dominoes)}")
     print(f"Regions: {len(board.regions)}")
 
-    input("\nPress Enter to start solving...")
+    input("\nPress Enter to solve...")
 
-    solution = solve_pips_interactive(board)
+    # Solve and collect steps
+    final_solution, steps = solve_and_collect_steps(board)
 
-    return solution
+    if not final_solution:
+        return
+
+    print(f"\nCollected {len(steps)} steps")
+    input("Press Enter to start stepping through solution...")
+
+    # Setup visualization
+    viz = PipsVisualizer(board)
+    plt.ion()
+    fig, ax = plt.subplots(figsize=(10, 10))
+
+    print("\n" + "🧩 " * 20)
+    print("INTERACTIVE PIPS SOLVER")
+    print("🧩 " * 20 + "\n")
+
+    step_num = 0
+    skip_to_end = False
+
+    for action, grid, domino_id in steps:
+        if skip_to_end and action != 'solved':
+            continue
+
+        step_num += 1
+
+        # Create title
+        if action == 'start':
+            title = f"Step {step_num}: Starting puzzle"
+        elif action == 'selecting':
+            title = f"Step {step_num}: Selecting domino {domino_id}"
+        elif action == 'place':
+            title = f"Step {step_num}: Placed domino {domino_id}"
+        elif action == 'solved':
+            title = f"Step {step_num}: ✓ SOLVED!"
+        else:
+            title = f"Step {step_num}: {action}"
+
+        # Display
+        plt.sca(ax)
+        viz.visualize(grid, title=title)
+        plt.draw()
+        plt.pause(0.01)
+
+        # Print info
+        print("=" * 60)
+        print(title)
+        print("=" * 60)
+        print(f"Cells filled: {len(grid)}")
+
+        if action == 'solved':
+            print(f"\n🎉 PUZZLE SOLVED!")
+            print(f"Total cells: {len(grid)}")
+            print(f"Expected cells: {sum(len(r.cells) for r in board.regions)}")
+
+            # Verify completeness
+            total_expected = sum(len(r.cells) for r in board.regions)
+            if len(grid) == total_expected:
+                print("✓ All cells filled correctly!")
+            else:
+                print(f"⚠️  Warning: Only {len(grid)}/{total_expected} cells filled")
+
+        # Wait for user
+        print("-" * 60)
+        if action != 'solved':
+            response = input("Press Enter (or 'q' to quit, 's' to skip to end): ")
+            print()
+
+            if response.lower() == 'q':
+                print("Quitting...")
+                plt.close()
+                return
+            elif response.lower() == 's':
+                skip_to_end = True
+                print("Skipping to solution...\n")
+
+    print("\n" + "🎉" * 30)
+    print("SUCCESS!")
+    print("🎉" * 30)
+    input("\nPress Enter to close...")
+    plt.close()
+
 
 if __name__ == "__main__":
     import sys
 
-    # Command line arguments
-    date = sys.argv[1] if len(sys.argv) > 1 else "2025-11-20"
-    difficulty = sys.argv[2] if len(sys.argv) > 2 else "easy"
-
-    interactive_demo(date, difficulty)
-
+    if len(sys.argv) > 1:
+        # Specific puzzle mode
+        date = sys.argv[1]
+        difficulty = sys.argv[2] if len(sys.argv) > 2 else "easy"
+        interactive_demo(use_random=False, date=date, difficulty=difficulty)
+    else:
+        # Random puzzle mode (default)
+        interactive_demo(use_random=True)

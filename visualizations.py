@@ -182,9 +182,9 @@ def test_visualization():
     from load_board import get_random_pips_game
     from csp import solve_pips
 
-    board = parse_pips_json(Path("all_boards/2025-11-20.json"), "easy")
+    board = get_random_pips_game()
     viz = PipsVisualizer(board)
-    viz.show(title="Today's Puzzle")
+    viz.show(title="Empty Puzzle")
 
     print("Solving with CSP...")
     result = solve_pips(board)  # Changed: single return value
