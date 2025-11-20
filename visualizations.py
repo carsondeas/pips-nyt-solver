@@ -1,7 +1,11 @@
+from pathlib import Path
+
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from matplotlib.colors import to_rgba
 import numpy as np
+
+from load_board import parse_pips_json
 
 
 class PipsVisualizer:
@@ -178,15 +182,19 @@ def test_visualization():
     from load_board import get_random_pips_game
     from csp import solve_pips
 
-    print("Loading random puzzle...")
-    board = get_random_pips_game()
-
-    print("Visualizing empty board...")
+    board = parse_pips_json(Path("all_boards/2025-11-20.json"), "easy")
     viz = PipsVisualizer(board)
-    viz.show(title="Empty Puzzle")
+    viz.show(title="Today's Puzzle")
 
     print("Solving with CSP...")
-    solution, stats = solve_pips(board)
+    result = solve_pips(board)  # Changed: single return value
+
+    # Handle both old and new return formats
+    if isinstance(result, tuple):
+        solution, stats = result
+    else:
+        solution = result
+        stats = None
 
     if solution:
         print("Visualizing solution...")
@@ -194,6 +202,7 @@ def test_visualization():
         viz.save("solved_puzzle.png", solution)
     else:
         print("No solution found!")
+
 
 
 if __name__ == "__main__":
