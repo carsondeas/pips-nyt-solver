@@ -35,23 +35,27 @@ def solve_pips(board):
     regions = board.regions
     region_map = board.region_map
 
+    # only cells that belong to the puzzle are valid; the bounding box may include holes
+    valid_cells = set(region_map.keys())
+
     # generate all domino placements
     def generate_domino_placements(domino):
         a, b = domino.values
         placements = []
 
-        for r in range(R):
-            for c in range(C):
+        for (r, c) in valid_cells:
+            right = (r, c + 1)
+            down = (r + 1, c)
 
-                # horizontal
-                if c + 1 < C:
-                    placements.append(((r, c), (r, c+1), (a, b)))
-                    placements.append(((r, c), (r, c+1), (b, a)))
+            # horizontal
+            if right in valid_cells:
+                placements.append(((r, c), right, (a, b)))
+                placements.append(((r, c), right, (b, a)))
 
-                # vertical
-                if r + 1 < R:
-                    placements.append(((r, c), (r+1, c), (a, b)))
-                    placements.append(((r, c), (r+1, c), (b, a)))
+            # vertical
+            if down in valid_cells:
+                placements.append(((r, c), down, (a, b)))
+                placements.append(((r, c), down, (b, a)))
 
         return placements
 
@@ -88,6 +92,10 @@ def solve_pips(board):
 
     # attempt placement and check validity
     def placement_is_valid(c1, c2, v1, v2):
+        # both halves must be on valid puzzle cells
+        if c1 not in valid_cells or c2 not in valid_cells:
+            return False
+
         # cell 1 check
         reg1 = region_cells.get(c1)
         if reg1:
@@ -185,5 +193,7 @@ def solve_pips(board):
 
     # start dfs
     if dfs():
-        return grid
+        # ensure every puzzle cell is covered exactly once
+        if len(grid) == len(valid_cells) and set(grid.keys()) == valid_cells:
+            return grid
     return None
