@@ -24,6 +24,7 @@ class Board:
 
         self.region_map = self._build_region_map()
         self.rows, self.cols = self._compute_size()
+        self.valid_cells = set(self.region_map.keys())
 
     def _build_region_map(self):
         """map each cell (r,c) to region object."""
@@ -38,6 +39,27 @@ class Board:
         max_r = max(r for region in self.regions for (r, _) in region.cells)
         max_c = max(c for region in self.regions for (_, c) in region.cells)
         return max_r + 1, max_c + 1
+
+    # generate all domino placements
+    def generate_domino_placements(self, domino):
+        a, b = domino.values
+        placements = []
+
+        for (r, c) in self.valid_cells:
+            right = (r, c + 1)
+            down = (r + 1, c)
+
+            # horizontal
+            if right in self.valid_cells:
+                placements.append(((r, c), right, (a, b)))
+                placements.append(((r, c), right, (b, a)))
+
+            # vertical
+            if down in self.valid_cells:
+                placements.append(((r, c), down, (a, b)))
+                placements.append(((r, c), down, (b, a)))
+
+        return placements
 
     def __repr__(self):
         return (
