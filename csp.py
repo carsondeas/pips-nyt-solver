@@ -28,6 +28,31 @@ def region_ok_partial(region, values):
 
     return True
 
+# similar to region_ok_partial but for full placements
+def region_ok_full(region, values):
+    t = region.type
+    target = region.target
+
+    if t == "empty":
+        return True
+
+    if t == "equals":
+        return len(set(values)) == 1
+
+    if t == "notequals":
+        return len(values) == len(set(values))
+
+    if t == "less":
+        return all(v < target for v in values)
+
+    if t == "greater":
+        return all(v > target for v in values)
+
+    if t == "sum":
+        return sum(values) == target
+
+    return True
+
 
 def solve_pips(board):
     R, C = board.rows, board.cols
@@ -35,23 +60,27 @@ def solve_pips(board):
     regions = board.regions
     region_map = board.region_map
 
-    # generate all domino placements
+    # only cells that belong to the puzzle are valid; the bounding box may include holes
+    valid_cells = set(region_map.keys())
+
+    # generate all domino placements restricted to valid cells
     def generate_domino_placements(domino):
         a, b = domino.values
         placements = []
 
-        for r in range(R):
-            for c in range(C):
+        for (r, c) in valid_cells:
+            right = (r, c + 1)
+            down = (r + 1, c)
 
-                # horizontal
-                if c + 1 < C:
-                    placements.append(((r, c), (r, c+1), (a, b)))
-                    placements.append(((r, c), (r, c+1), (b, a)))
+            # horizontal
+            if right in valid_cells:
+                placements.append(((r, c), right, (a, b)))
+                placements.append(((r, c), right, (b, a)))
 
-                # vertical
-                if r + 1 < R:
-                    placements.append(((r, c), (r+1, c), (a, b)))
-                    placements.append(((r, c), (r+1, c), (b, a)))
+            # vertical
+            if down in valid_cells:
+                placements.append(((r, c), down, (a, b)))
+                placements.append(((r, c), down, (b, a)))
 
         return placements
 
@@ -88,17 +117,26 @@ def solve_pips(board):
 
     # attempt placement and check validity
     def placement_is_valid(c1, c2, v1, v2):
+        # both halves must be on valid puzzle cells
+        if c1 not in valid_cells or c2 not in valid_cells:
+            return False
+
         # cell 1 check
         reg1 = region_cells.get(c1)
         if reg1:
-            vals = [grid[c] for c in reg1.cells if c in grid] + [v1]
+            vals = [grid[c] for c in reg1.cells if c in grid]
+            vals.append(v1)
+            # if both halves share the same region, include the second value
+            if reg1 is region_cells.get(c2):
+                vals.append(v2)
             if not region_ok_partial(reg1, vals):
                 return False
 
         # cell 2 check
         reg2 = region_cells.get(c2)
-        if reg2:
-            vals = [grid[c] for c in reg2.cells if c in grid] + [v2]
+        if reg2 and reg2 is not reg1:
+            vals = [grid[c] for c in reg2.cells if c in grid]
+            vals.append(v2)
             if not region_ok_partial(reg2, vals):
                 return False
 
@@ -143,8 +181,15 @@ def solve_pips(board):
             remaining_domains[idx].extend(items)
 
 
-    def dfs():
+    def dfs(valid_cells=valid_cells):
         if all(used):
+            # ensure complete coverage and all regions satisfied
+            if len(grid) != len(valid_cells) or set(grid.keys()) != valid_cells:
+                return False
+            for region in regions:
+                vals = [grid[c] for c in region.cells]
+                if not region_ok_full(region, vals):
+                    return False
             return True
 
         d = select_domino()

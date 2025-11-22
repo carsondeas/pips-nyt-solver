@@ -116,13 +116,15 @@ def state_to_grid(state):
         grid[c2] = v2
     return grid
 
-def solve_pips(board,
+def solve_pips_a(board,
                T_start=5.0,
                cooling=0.9995,
                max_iters=300000,
                restarts=12):
 
-    placement_options = generate_all_placements(board)
+    placement_options = [
+        board.generate_domino_placements(d) for d in board.dominoes
+    ]
 
     best_global = None
     best_global_energy = float("inf")
