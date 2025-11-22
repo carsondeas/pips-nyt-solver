@@ -3,6 +3,10 @@ import sys
 from board_objects import Board
 from load_board import get_random_pips_game, parse_pips_json
 from pathlib import Path
+import time
+from typing import Dict, List, Optional, Tuple
+from csp import solve_pips as solve_csp
+from simulated_annealing import solve_pips_a as solve_anneal
 
 
 class SimpleBoardVisualizer:
@@ -46,6 +50,8 @@ class SimpleBoardVisualizer:
             'black': (30, 30, 30),
             'grid': (200, 200, 200),
             'label_bg': (100, 100, 100),
+            'highlight': (30, 144, 255),
+            'placed': (46, 139, 87),
         }
         
         # Generate colors for each region
@@ -53,8 +59,29 @@ class SimpleBoardVisualizer:
         
         # Clock for frame rate
         self.clock = pygame.time.Clock()
+
+        # Step-by-step state
+        self.steps: List[Tuple[str, Dict[Tuple[int, int], int], Optional[Tuple[Tuple[int, int], Tuple[int, int]]], Optional[int]]] = []
+        self.step_index: int = 0
+        self.current_grid: Dict[Tuple[int, int], int] = {}
+        self.current_action: str = 'start'
+        self.current_highlight: Optional[Tuple[Tuple[int, int], Tuple[int, int]]] = None
+        self.current_domino_id: Optional[int] = None
+        self.placed_domino_ids = set()
+        self.autoplay: bool = False
+        self.autoplay_delay_s: float = 0.5
+        self._last_advance_time: float = time.time()
         
         print(f"Initialized visualizer for {board.rows}x{board.cols} board")
+
+    def set_steps(self, steps, autoplay=False, delay_s=0.5):
+        """Attach step sequence produced by a solver"""
+        self.steps = steps or []
+        self.autoplay = autoplay
+        self.autoplay_delay_s = max(0.05, float(delay_s))
+        self.step_index = 0
+        if self.steps:
+            self._apply_step(0)
     
     def _generate_region_colors(self):
         """Generate soft colors for each region"""
@@ -90,6 +117,12 @@ class SimpleBoardVisualizer:
         
         # Draw region labels (constraint badges)
         self._draw_constraint_labels()
+
+        # Draw any filled values
+        self._draw_grid_values()
+
+        # Highlight current step placement
+        self._draw_current_highlight()
         
         # Draw dominoes at bottom
         self._draw_dominoes()
@@ -135,44 +168,35 @@ class SimpleBoardVisualizer:
             )
     
     def _draw_constraint_labels(self):
-        """Draw diamond-shaped constraint labels for each region"""
+        """Draw compact rule badges at the top-left corner of each region"""
+        padding = 6
         for region in self.board.regions:
-            # Calculate center position of region
             if not region.cells:
                 continue
-            
-            center_r = sum(r for r, c in region.cells) / len(region.cells)
-            center_c = sum(c for r, c in region.cells) / len(region.cells)
-            
-            x = int(center_c * self.cell_size + self.cell_size / 2)
-            y = int(center_r * self.cell_size + self.cell_size / 2)
-            
-            # Get constraint text
+
+            # Anchor to the actual top-left-most cell in this region
+            top_r, top_c = min(region.cells, key=lambda rc: (rc[0], rc[1]))
+            x = top_c * self.cell_size + padding
+            y = top_r * self.cell_size + padding
+
             text = self._format_constraint(region)
-            
-            # Draw diamond shape
-            size = 40
-            points = [
-                (x, y - size),      # top
-                (x + size, y),      # right
-                (x, y + size),      # bottom
-                (x - size, y),      # left
-            ]
-            
-            # Draw diamond with region color
-            pygame.draw.polygon(self.screen, self.region_colors[region], points)
-            pygame.draw.polygon(self.screen, self.COLORS['black'], points, 3)
-            
-            # Draw text
-            text_surface = self.font_medium.render(text, True, self.COLORS['black'])
-            text_rect = text_surface.get_rect(center=(x, y))
+            if not text:
+                continue
+
+            text_surface = self.font_small.render(text, True, self.COLORS['black'])
+            text_rect = text_surface.get_rect(topleft=(x, y))
+
+            bg_rect = text_rect.inflate(8, 4)
+            pygame.draw.rect(self.screen, self.COLORS['white'], bg_rect, 0, border_radius=6)
+            pygame.draw.rect(self.screen, self.COLORS['black'], bg_rect, 1, border_radius=6)
+
             self.screen.blit(text_surface, text_rect)
     
     def _format_constraint(self, region):
         """Format constraint text for display"""
         if region.type == 'equals':
             return '='
-        elif region.type == 'notequals':
+        elif region.type in ('unequal', 'notequals'):
             return '≠'
         elif region.type == 'sum':
             return str(region.target)
@@ -185,50 +209,37 @@ class SimpleBoardVisualizer:
         return '?'
     
     def _draw_dominoes(self):
-        """Draw dominoes at the bottom of the screen"""
+        """Draw remaining (unplaced) dominoes at the bottom using numbers"""
         y_start = self.board.rows * self.cell_size + 20
-        domino_width = 100
-        domino_height = 50
-        spacing = 20
-        
-        # Calculate starting x to center dominoes
-        total_width = len(self.board.dominoes) * (domino_width + spacing) - spacing
+        domino_width = 90
+        domino_height = 52
+        spacing = 16
+
+        remaining = [d for d in self.board.dominoes if d.id not in self.placed_domino_ids]
+        if not remaining:
+            return
+
+        total_width = len(remaining) * (domino_width + spacing) - spacing
         x_start = (self.width - total_width) // 2
-        
-        for i, domino in enumerate(self.board.dominoes):
+
+        for i, domino in enumerate(remaining):
             x = x_start + i * (domino_width + spacing)
             y = y_start
-            
-            # Draw domino rectangle
+
             rect = pygame.Rect(x, y, domino_width, domino_height)
             pygame.draw.rect(self.screen, self.COLORS['white'], rect)
             pygame.draw.rect(self.screen, self.COLORS['black'], rect, 3, border_radius=5)
-            
-            # Draw dividing line
+
             mid_x = x + domino_width // 2
-            pygame.draw.line(
-                self.screen,
-                self.COLORS['black'],
-                (mid_x, y),
-                (mid_x, y + domino_height),
-                2
-            )
-            
-            # Draw dots for first value
-            self._draw_domino_dots(
-                x + domino_width // 4,
-                y + domino_height // 2,
-                domino.values[0],
-                15
-            )
-            
-            # Draw dots for second value
-            self._draw_domino_dots(
-                x + 3 * domino_width // 4,
-                y + domino_height // 2,
-                domino.values[1],
-                15
-            )
+            pygame.draw.line(self.screen, self.COLORS['black'], (mid_x, y), (mid_x, y + domino_height), 2)
+
+            left_val, right_val = domino.values
+            left_text = self.font_medium.render(str(left_val), True, self.COLORS['black'])
+            right_text = self.font_medium.render(str(right_val), True, self.COLORS['black'])
+            left_rect = left_text.get_rect(center=(x + domino_width // 4, y + domino_height // 2))
+            right_rect = right_text.get_rect(center=(x + 3 * domino_width // 4, y + domino_height // 2))
+            self.screen.blit(left_text, left_rect)
+            self.screen.blit(right_text, right_rect)
     
     def _draw_domino_dots(self, center_x, center_y, value, size):
         """Draw dots on domino to represent value (0-6)"""
@@ -258,13 +269,47 @@ class SimpleBoardVisualizer:
                     (center_x + dx, center_y + dy),
                     dot_radius
                 )
+
+    def _draw_grid_values(self):
+        """Draw numbers for any filled cells in the current grid"""
+        if not self.current_grid:
+            return
+        for (r, c), val in self.current_grid.items():
+            x = int(c * self.cell_size + self.cell_size / 2)
+            y = int(r * self.cell_size + self.cell_size / 2)
+            text_surface = self.font_large.render(str(val), True, self.COLORS['black'])
+            text_rect = text_surface.get_rect(center=(x, y))
+            self.screen.blit(text_surface, text_rect)
+
+    def _draw_current_highlight(self):
+        """Draw a border around the currently selected/placed domino"""
+        if not self.current_highlight:
+            return
+        (r1, c1), (r2, c2) = self.current_highlight
+        if r1 == r2:
+            x = min(c1, c2) * self.cell_size
+            y = r1 * self.cell_size
+            w = 2 * self.cell_size
+            h = self.cell_size
+        else:
+            x = c1 * self.cell_size
+            y = min(r1, r2) * self.cell_size
+            w = self.cell_size
+            h = 2 * self.cell_size
+        rect = pygame.Rect(x, y, w, h)
+        color = self.COLORS['highlight'] if self.current_action == 'selecting' else self.COLORS['placed']
+        pygame.draw.rect(self.screen, color, rect, 6, border_radius=8)
     
     def run(self):
         """Main loop to display the board"""
         print("\nDisplay Controls:")
         print("  ESC or close window - Exit")
+        print("  SPACE/RIGHT - Next step")
+        print("  LEFT - Previous step")
+        print("  A - Toggle autoplay")
+        print("  R - Reset to start")
         print("\nShowing board...\n")
-        
+
         running = True
         while running:
             # Handle events
@@ -274,6 +319,23 @@ class SimpleBoardVisualizer:
                 elif event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE:
                         running = False
+                    elif event.key in (pygame.K_SPACE, pygame.K_RIGHT):
+                        self._advance_step(+1)
+                    elif event.key == pygame.K_LEFT:
+                        self._advance_step(-1)
+                    elif event.key == pygame.K_a:
+                        self.autoplay = not self.autoplay
+                        self._last_advance_time = time.time()
+                        print(f"Autoplay: {'ON' if self.autoplay else 'OFF'}")
+                    elif event.key == pygame.K_r:
+                        self._jump_to(0)
+
+            # Autoplay step advance
+            if self.autoplay and self.steps:
+                now = time.time()
+                if now - self._last_advance_time >= self.autoplay_delay_s:
+                    self._last_advance_time = now
+                    self._advance_step(+1)
             
             # Draw everything
             self.draw_board()
@@ -284,6 +346,42 @@ class SimpleBoardVisualizer:
         
         pygame.quit()
         print("Window closed")
+
+    def _apply_step(self, idx: int):
+        """Apply step at index to update current state"""
+        if not self.steps:
+            self.current_action = 'start'
+            self.current_grid = {}
+            self.current_highlight = None
+            self.step_index = 0
+            return
+        idx = max(0, min(idx, len(self.steps) - 1))
+        action, grid_snapshot, placement, domino_id = self.steps[idx]
+        self.current_action = action
+        self.current_grid = grid_snapshot
+        self.current_highlight = placement
+        self.current_domino_id = domino_id
+        self.step_index = idx
+
+        # recompute placed domino ids up to and including this step
+        placed = set()
+        for a, _g, _p, d_id in self.steps[:idx + 1]:
+            if a == 'place' and d_id is not None:
+                placed.add(d_id)
+        self.placed_domino_ids = placed
+
+    def _advance_step(self, delta: int):
+        if not self.steps:
+            return
+        new_idx = self.step_index + delta
+        new_idx = max(0, min(new_idx, len(self.steps) - 1))
+        if new_idx != self.step_index:
+            self._apply_step(new_idx)
+
+    def _jump_to(self, idx: int):
+        if not self.steps:
+            return
+        self._apply_step(idx)
 
 
 def main():
@@ -296,6 +394,11 @@ def main():
                        default='easy', help='Puzzle difficulty')
     parser.add_argument('--cell-size', type=int, default=100, 
                        help='Cell size in pixels')
+    parser.add_argument('--solver', choices=['csp', 'anneal'], default='csp',
+                       help='Choose solver to generate solution')
+    parser.add_argument('--auto', action='store_true', help='Autoplay steps after solving')
+    parser.add_argument('--delay', type=float, default=0.5, help='Autoplay step delay in seconds')
+    parser.add_argument('--debug', action='store_true', help='Print solution and step mapping for debugging')
     
     args = parser.parse_args()
     
@@ -311,10 +414,114 @@ def main():
     print(f"Dominoes: {len(board.dominoes)}")
     print(f"Regions: {len(board.regions)}")
     
+    # Solve and build steps
+    print(f"Solving using: {args.solver.upper()}")
+    if args.solver == 'csp':
+        solution = solve_csp(board)
+    else:
+        solution = solve_anneal(board)
+
+    if not solution:
+        print("No solution found. Displaying board only.")
+        steps = []
+    else:
+        if args.debug:
+            print("\n=== Solver Solution (cell -> value) ===")
+            for (r, c) in sorted(solution.keys()):
+                print(f"({r},{c}) = {solution[(r,c)]}")
+            print("=== End Solution ===\n")
+            _debug_print_solution_grid(solution, board)
+        steps = _build_steps_from_solution(solution, board, debug=args.debug)
+        print(f"Built {len(steps)} steps.")
+
     # Create and run visualizer
     viz = SimpleBoardVisualizer(board, cell_size=args.cell_size)
+    if steps:
+        viz.set_steps(steps, autoplay=args.auto, delay_s=args.delay)
     viz.run()
 
+
+def _build_steps_from_solution(final_solution: Dict[Tuple[int, int], int], board: Board, debug: bool = False):
+    """Create a list of (action, grid_snapshot, placement_cells, domino_id) steps from final grid.
+    """
+    steps: List[Tuple[str, Dict[Tuple[int, int], int], Optional[Tuple[Tuple[int, int], Tuple[int, int]]], Optional[int]]] = []
+    steps.append(('start', {}, None, None))
+
+    # Build availability map: unordered (a,b) -> list of domino ids
+    def key_unordered(a: int, b: int) -> Tuple[int, int]:
+        return (a, b) if a <= b else (b, a)
+
+    available: Dict[Tuple[int, int], List[int]] = {}
+    for d in board.dominoes:
+        ka = key_unordered(d.values[0], d.values[1])
+        available.setdefault(ka, []).append(d.id)
+
+    # Process cells in order; choose a neighbor that matches an available domino
+    processed = set()
+    current_grid: Dict[Tuple[int, int], int] = {}
+
+    for (r, c) in sorted(final_solution.keys()):
+        if (r, c) in processed:
+            continue
+
+        v = final_solution[(r, c)]
+        neighbors = [(r, c + 1), (r + 1, c), (r, c - 1), (r - 1, c)]
+
+        chosen = None
+        for nr, nc in neighbors:
+            if (nr, nc) not in final_solution or (nr, nc) in processed:
+                continue
+            vn = final_solution[(nr, nc)]
+            k = key_unordered(v, vn)
+            ids = available.get(k, [])
+            if ids:
+                did = ids.pop(0)
+                chosen = (((r, c), (nr, nc)), did)
+                if debug:
+                    dom_vals = next((d.values for d in board.dominoes if d.id == did), None)
+                    print(f"[map] cells {(r, c)}<->({nr, nc}) values ({v}|{vn}) -> domino #{did} values {dom_vals}")
+                break
+
+        if not chosen:
+            # No neighbor fits any available domino. Warn and skip pairing this cell.
+            if debug:
+                print(f"[warn] no available domino fits cell {(r, c)} value {v}; neighbors tried {neighbors}")
+            processed.add((r, c))
+            continue
+
+        cells, domino_id = chosen
+
+        # Step: selecting
+        steps.append(('selecting', dict(current_grid), cells, domino_id))
+
+        # Step: place values
+        (r1, c1), (r2, c2) = cells
+        current_grid[(r1, c1)] = final_solution[(r1, c1)]
+        current_grid[(r2, c2)] = final_solution[(r2, c2)]
+        steps.append(('place', dict(current_grid), cells, domino_id))
+
+        # Mark both halves processed
+        processed.add((r1, c1))
+        processed.add((r2, c2))
+
+    # done
+    steps.append(('solved', dict(final_solution), None, None))
+    return steps
+
+
+def _debug_print_solution_grid(grid: Dict[Tuple[int, int], int], board: Board):
+    """Pretty-print the solution as an RxC grid for quick visual verification."""
+    print("Grid view (rows top->bottom, cols left->right):")
+    for r in range(board.rows):
+        row_vals = []
+        for c in range(board.cols):
+            if (r, c) in board.valid_cells if hasattr(board, 'valid_cells') else True:
+                v = grid.get((r, c))
+                row_vals.append('.' if v is None else str(v))
+            else:
+                row_vals.append(' ')
+        print(' '.join(row_vals))
+    print()
 
 if __name__ == '__main__':
     main()
