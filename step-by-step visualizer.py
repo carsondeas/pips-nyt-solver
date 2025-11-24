@@ -24,8 +24,9 @@ class PipsVisualizer:
 
         return region_map
 
-    def visualize(self, solution=None, title="Pips Puzzle"):
-        ax = plt.gca()
+    def visualize(self, solution=None, title="Pips Puzzle", ax_board=None, ax_tray=None, domino_states=None):
+        """Draw the board plus (optionally) the domino tray."""
+        ax = ax_board if ax_board is not None else plt.gca()
         ax.clear()
 
         R, C = self.board.rows, self.board.cols
@@ -59,9 +60,9 @@ class PipsVisualizer:
                 if region.type == "equals":
                     label = "="
                 elif region.type == "notequals":
-                    label = "≠"
+                    label = "!="
                 elif region.type == "sum":
-                    label = f"Σ={region.target}"
+                    label = f"sum={region.target}"
                 elif region.type == "less":
                     label = f"<{region.target}"
                 elif region.type == "greater":
@@ -86,6 +87,8 @@ class PipsVisualizer:
         ax.set_aspect('equal')
         ax.axis('off')
         ax.set_title(title, fontsize=16, fontweight='bold')
+        if ax_tray is not None:
+            self._draw_domino_tray(ax_tray, domino_states or {})
 
     def _draw_domino_boundaries(self, ax, solution, R, C):
         domino_pairs = {}
@@ -114,6 +117,62 @@ class PipsVisualizer:
                 )
                 ax.add_patch(rect)
 
+    def _draw_domino_tray(self, ax, domino_states):
+        """Render the full domino set along the bottom."""
+        ax.clear()
+
+        cols = 7
+        domino_width = 2.0
+        domino_height = 1.2
+        spacing = 0.4
+
+        status_colors = {
+            "unplaced": "#d9d9d9",
+            "active": "#ffd166",
+            "placed": "#a3c4f3",
+        }
+
+        for idx, domino in enumerate(self.board.dominoes):
+            row = idx // cols
+            col = idx % cols
+
+            x = col * (domino_width + spacing)
+            y = row * (domino_height + spacing)
+
+            state = domino_states.get(domino.id, "unplaced")
+            color = status_colors.get(state, "#d9d9d9")
+
+            rect = patches.Rectangle(
+                (x, y),
+                domino_width,
+                domino_height,
+                linewidth=2,
+                edgecolor='black',
+                facecolor=color
+            )
+            ax.add_patch(rect)
+
+            ax.plot(
+                [x + domino_width / 2, x + domino_width / 2],
+                [y, y + domino_height],
+                color="black",
+                linewidth=2
+            )
+
+            a, b = domino.values
+            ax.text(x + 0.5, y + domino_height / 2, str(a), ha="center", va="center", fontsize=12, fontweight="bold", zorder=3)
+            ax.text(x + 1.5, y + domino_height / 2, str(b), ha="center", va="center", fontsize=12, fontweight="bold", zorder=3)
+
+        total_rows = (len(self.board.dominoes) + cols - 1) // cols
+        width = cols * (domino_width + spacing) - spacing
+        height = total_rows * (domino_height + spacing) - spacing
+
+        ax.set_xlim(-spacing, width + spacing)
+        ax.set_ylim(-spacing, height + spacing)
+        ax.invert_yaxis()
+        ax.axis("off")
+        ax.set_title("Domino Tray", fontsize=12, fontweight="bold")
+
 
 def solve_and_collect_steps(board):
     """
@@ -134,9 +193,9 @@ def solve_and_collect_steps(board):
 
     if not final_solution:
         print("No solution found!")
-        return None, []
+        return None, [], {}
 
-    print(f"✓ Solution found with {len(final_solution)} cells")
+    print(f"Solution found with {len(final_solution)} cells")
 
     # Now simulate the solving process step-by-step
     # by progressively revealing the solution
@@ -163,32 +222,61 @@ def solve_and_collect_steps(board):
             processed.add((r, c))
             processed.add(other_half)
 
+    # Match placements to actual domino ids by value multiset
+    placement_records = []
+    domino_mapping = {}
+    used_ids = set()
+
+    value_to_ids = {}
+    for domino in board.dominoes:
+        key = tuple(sorted(domino.values))
+        value_to_ids.setdefault(key, []).append(domino.id)
+
+    for ids in value_to_ids.values():
+        ids.sort()
+
+    for cells in domino_placements:
+        vals = tuple(sorted((final_solution[cells[0]], final_solution[cells[1]])))
+        id_pool = value_to_ids.get(vals, [])
+
+        if id_pool:
+            match_id = id_pool.pop(0)
+        else:
+            remaining = [d.id for d in board.dominoes if d.id not in used_ids]
+            match_id = min(remaining) if remaining else -1
+
+        used_ids.add(match_id)
+        placement_records.append((match_id, cells))
+        domino_mapping[match_id] = cells
+
     # Create steps for each domino placement
     current_grid = {}
-    for idx, cells in enumerate(domino_placements):
-        steps.append(('selecting', copy.deepcopy(current_grid), idx))
+    for domino_id, cells in placement_records:
+        steps.append(('selecting', copy.deepcopy(current_grid), domino_id))
 
         # Place domino
         for cell in cells:
             current_grid[cell] = final_solution[cell]
 
-        steps.append(('place', copy.deepcopy(current_grid), idx))
+        steps.append(('place', copy.deepcopy(current_grid), domino_id))
 
     steps.append(('solved', copy.deepcopy(final_solution), None))
 
-    return final_solution, steps
+    return final_solution, steps, domino_mapping
 
 
-def interactive_demo(use_random=True, date="2025-11-20", difficulty="easy"):
+def interactive_demo(use_random=True, date="2025-11-20", difficulty="easy", board=None):
     """Run interactive step-by-step display"""
 
-    if use_random:
+    if board is None and use_random:
         from load_board import get_random_pips_game
         print("\nLoading random puzzle...")
         board = get_random_pips_game()
-    else:
+    elif board is None:
         print(f"\nLoading puzzle: {date} ({difficulty})")
         board = parse_pips_json(Path(f"all_boards/{date}.json"), difficulty)
+    else:
+        print("\nUsing provided board")
 
     print(f"Board size: {board.rows}x{board.cols}")
     print(f"Dominoes: {len(board.dominoes)}")
@@ -197,7 +285,7 @@ def interactive_demo(use_random=True, date="2025-11-20", difficulty="easy"):
     input("\nPress Enter to solve...")
 
     # Solve and collect steps
-    final_solution, steps = solve_and_collect_steps(board)
+    final_solution, steps, domino_mapping = solve_and_collect_steps(board)
 
     if not final_solution:
         return
@@ -208,11 +296,14 @@ def interactive_demo(use_random=True, date="2025-11-20", difficulty="easy"):
     # Setup visualization
     viz = PipsVisualizer(board)
     plt.ion()
-    fig, ax = plt.subplots(figsize=(10, 10))
+    fig = plt.figure(figsize=(10, 12))
+    gs = fig.add_gridspec(2, 1, height_ratios=[4, 1], hspace=0.35)
+    ax_board = fig.add_subplot(gs[0])
+    ax_tray = fig.add_subplot(gs[1])
 
-    print("\n" + "🧩 " * 20)
+    print("\n" + "=" * 40)
     print("INTERACTIVE PIPS SOLVER")
-    print("🧩 " * 20 + "\n")
+    print("=" * 40 + "\n")
 
     step_num = 0
     skip_to_end = False
@@ -231,13 +322,29 @@ def interactive_demo(use_random=True, date="2025-11-20", difficulty="easy"):
         elif action == 'place':
             title = f"Step {step_num}: Placed domino {domino_id}"
         elif action == 'solved':
-            title = f"Step {step_num}: ✓ SOLVED!"
+            title = f"Step {step_num}: SOLVED!"
         else:
             title = f"Step {step_num}: {action}"
 
+        domino_states = {}
+        for domino in board.dominoes:
+            cells = domino_mapping.get(domino.id)
+            if cells and all(cell in grid for cell in cells):
+                domino_states[domino.id] = "placed"
+            else:
+                domino_states[domino.id] = "unplaced"
+
+        if action == 'selecting' and domino_id is not None:
+            domino_states[domino_id] = "active"
+
         # Display
-        plt.sca(ax)
-        viz.visualize(grid, title=title)
+        viz.visualize(
+            grid,
+            title=title,
+            ax_board=ax_board,
+            ax_tray=ax_tray,
+            domino_states=domino_states
+        )
         plt.draw()
         plt.pause(0.01)
 
@@ -248,16 +355,16 @@ def interactive_demo(use_random=True, date="2025-11-20", difficulty="easy"):
         print(f"Cells filled: {len(grid)}")
 
         if action == 'solved':
-            print(f"\n🎉 PUZZLE SOLVED!")
+            print("\nPUZZLE SOLVED!")
             print(f"Total cells: {len(grid)}")
             print(f"Expected cells: {sum(len(r.cells) for r in board.regions)}")
 
             # Verify completeness
             total_expected = sum(len(r.cells) for r in board.regions)
             if len(grid) == total_expected:
-                print("✓ All cells filled correctly!")
+                print("All cells filled correctly!")
             else:
-                print(f"⚠️  Warning: Only {len(grid)}/{total_expected} cells filled")
+                print(f"Warning: Only {len(grid)}/{total_expected} cells filled")
 
         # Wait for user
         print("-" * 60)
@@ -273,9 +380,9 @@ def interactive_demo(use_random=True, date="2025-11-20", difficulty="easy"):
                 skip_to_end = True
                 print("Skipping to solution...\n")
 
-    print("\n" + "🎉" * 30)
+    print("\n" + "=" * 40)
     print("SUCCESS!")
-    print("🎉" * 30)
+    print("=" * 40)
     input("\nPress Enter to close...")
     plt.close()
 

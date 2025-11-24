@@ -116,7 +116,7 @@ def state_to_grid(state):
         grid[c2] = v2
     return grid
 
-def solve_pips_a(board,
+def solve_pips(board,
                T_start=5.0,
                cooling=0.9995,
                max_iters=300000,
