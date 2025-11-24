@@ -1,12 +1,10 @@
 import pygame
 import sys
-from board_objects import Board
-from load_board import get_random_pips_game, parse_pips_json
-from pathlib import Path
-import time
 from typing import Dict, List, Optional, Tuple
+import time
+from board_objects import Board
 from csp import solve_pips as solve_csp
-from simulated_annealing import solve_pips_a as solve_anneal
+from simulated_annealing import solve_pips as solve_anneal
 
 
 class SimpleBoardVisualizer:
@@ -384,60 +382,46 @@ class SimpleBoardVisualizer:
         self._apply_step(idx)
 
 
-def main():
-    """Main function"""
-    import argparse
-    
-    parser = argparse.ArgumentParser(description='Simple PIPS Board Visualizer')
-    parser.add_argument('--file', type=str, help='Path to puzzle JSON file')
-    parser.add_argument('--difficulty', choices=['easy', 'medium', 'hard'], 
-                       default='easy', help='Puzzle difficulty')
-    parser.add_argument('--cell-size', type=int, default=100, 
-                       help='Cell size in pixels')
-    parser.add_argument('--solver', choices=['csp', 'anneal'], default='csp',
-                       help='Choose solver to generate solution')
-    parser.add_argument('--auto', action='store_true', help='Autoplay steps after solving')
-    parser.add_argument('--delay', type=float, default=0.5, help='Autoplay step delay in seconds')
-    parser.add_argument('--debug', action='store_true', help='Print solution and step mapping for debugging')
-    
-    args = parser.parse_args()
-    
-    # Load board
-    print("Loading puzzle...")
-    if args.file:
-        board = parse_pips_json(Path(args.file), difficulty=args.difficulty)
-        print(f"Loaded: {args.file} ({args.difficulty})")
-    else:
-        board = get_random_pips_game()
-    
+def run_pygame_visualizer(
+    board: Board,
+    solver: str = "csp",
+    cell_size: int = 100,
+    auto: bool = False,
+    delay: float = 0.5,
+    debug: bool = False,
+):
+    """Solve a board and launch the pygame visualizer."""
+    if board is None:
+        raise ValueError("board must be provided")
+
     print(f"Board: {board.rows}x{board.cols}")
     print(f"Dominoes: {len(board.dominoes)}")
     print(f"Regions: {len(board.regions)}")
-    
-    # Solve and build steps
-    print(f"Solving using: {args.solver.upper()}")
-    if args.solver == 'csp':
+    print(f"Solving using: {solver.upper()}")
+
+    if solver == "csp":
         solution = solve_csp(board)
-    else:
+    elif solver == "anneal":
         solution = solve_anneal(board)
+    else:
+        raise ValueError(f"Unknown solver: {solver}")
 
     if not solution:
         print("No solution found. Displaying board only.")
         steps = []
     else:
-        if args.debug:
+        if debug:
             print("\n=== Solver Solution (cell -> value) ===")
             for (r, c) in sorted(solution.keys()):
                 print(f"({r},{c}) = {solution[(r,c)]}")
             print("=== End Solution ===\n")
             _debug_print_solution_grid(solution, board)
-        steps = _build_steps_from_solution(solution, board, debug=args.debug)
+        steps = _build_steps_from_solution(solution, board, debug=debug)
         print(f"Built {len(steps)} steps.")
 
-    # Create and run visualizer
-    viz = SimpleBoardVisualizer(board, cell_size=args.cell_size)
+    viz = SimpleBoardVisualizer(board, cell_size=cell_size)
     if steps:
-        viz.set_steps(steps, autoplay=args.auto, delay_s=args.delay)
+        viz.set_steps(steps, autoplay=auto, delay_s=delay)
     viz.run()
 
 
@@ -524,4 +508,4 @@ def _debug_print_solution_grid(grid: Dict[Tuple[int, int], int], board: Board):
     print()
 
 if __name__ == '__main__':
-    main()
+    print("This module is now launched via runner.py (use --pygame).")

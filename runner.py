@@ -8,6 +8,7 @@ from pathlib import Path
 from load_board import parse_pips_json, get_random_pips_game
 import csp as csp_solver
 import simulated_annealing as sa_solver
+from board_play import run_pygame_visualizer
 
 
 def run_solver_once(board, solver_name):
@@ -51,6 +52,11 @@ def main():
     p.add_argument("--repeat", type=int, default=1, help="How many times to run (for averages)")
     p.add_argument("--seed", type=int, default=None)
     p.add_argument("--gui", action="store_true", help="Launch the step-by-step visualizer")
+    p.add_argument("--pygame", action="store_true", help="Launch the pygame visualizer")
+    p.add_argument("--auto", action="store_true", help="(pygame) Autoplay steps after solving")
+    p.add_argument("--auto-delay", type=float, default=0.5, help="(pygame) Autoplay step delay in seconds")
+    p.add_argument("--cell-size", type=int, default=100, help="(pygame) Cell size in pixels")
+    p.add_argument("--debug", action="store_true", help="(pygame) Print solver mapping for debugging")
 
     args = p.parse_args()
 
@@ -61,6 +67,21 @@ def main():
 
     if args.gui:
         launch_gui(board)
+        return
+
+    if args.pygame:
+        solver_for_gui = args.solver
+        if solver_for_gui == "all":
+            solver_for_gui = "csp"
+            print("Solver 'all' is not supported in pygame mode; defaulting to CSP.")
+        run_pygame_visualizer(
+            board,
+            solver=solver_for_gui,
+            cell_size=args.cell_size,
+            auto=args.auto,
+            delay=args.auto_delay,
+            debug=args.debug,
+        )
         return
 
     solvers = ["csp", "anneal"] if args.solver == "all" else [args.solver]
