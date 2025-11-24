@@ -2,6 +2,7 @@ import argparse
 import time
 import statistics
 import random
+import importlib.util
 from pathlib import Path
 
 from load_board import parse_pips_json, get_random_pips_game
@@ -30,6 +31,18 @@ def load_board_from_args(args):
     return get_random_pips_game(difficulty=args.difficulty)
 
 
+def launch_gui(board):
+    """Load and run the interactive visualizer with a provided board."""
+    viz_path = Path(__file__).parent / "step-by-step visualizer.py"
+    spec = importlib.util.spec_from_file_location("step_by_step_visualizer", viz_path)
+    if spec is None or spec.loader is None:
+        raise ImportError("Could not load visualizer module")
+
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    module.interactive_demo(use_random=False, board=board)
+
+
 def main():
     p = argparse.ArgumentParser(description="Run/benchmark Pips solvers")
     p.add_argument("--solver", choices=["csp", "anneal", "all"], default="all")
@@ -37,6 +50,7 @@ def main():
     p.add_argument("--difficulty", choices=["easy", "medium", "hard"], default="easy")
     p.add_argument("--repeat", type=int, default=1, help="How many times to run (for averages)")
     p.add_argument("--seed", type=int, default=None)
+    p.add_argument("--gui", action="store_true", help="Launch the step-by-step visualizer")
 
     args = p.parse_args()
 
@@ -44,6 +58,10 @@ def main():
         random.seed(args.seed)
 
     board = load_board_from_args(args)
+
+    if args.gui:
+        launch_gui(board)
+        return
 
     solvers = ["csp", "anneal"] if args.solver == "all" else [args.solver]
 
