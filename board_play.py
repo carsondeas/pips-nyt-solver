@@ -5,6 +5,7 @@ import time
 from board_objects import Board
 from csp import solve_pips as solve_csp
 from simulated_annealing import solve_pips as solve_anneal
+from a_star_search import solve_pips as solve_astar
 
 
 class SimpleBoardVisualizer:
@@ -403,6 +404,8 @@ def run_pygame_visualizer(
         solution = solve_csp(board)
     elif solver == "anneal":
         solution = solve_anneal(board)
+    elif solver == "astar":
+        solution = solve_astar(board)
     else:
         raise ValueError(f"Unknown solver: {solver}")
 

@@ -8,6 +8,7 @@ from pathlib import Path
 from load_board import parse_pips_json, get_random_pips_game
 import csp as csp_solver
 import simulated_annealing as sa_solver
+import a_star_search as astar_solver
 from board_play import run_pygame_visualizer
 
 
@@ -17,6 +18,8 @@ def run_solver_once(board, solver_name):
         result = csp_solver.solve_pips(board)
     elif solver_name == "anneal":
         result = sa_solver.solve_pips(board)
+    elif solver_name == "astar":
+        result = astar_solver.solve_pips(board)
     else:
         raise ValueError(f"Unknown solver: {solver_name}")
     elapsed = time.perf_counter() - start
@@ -46,7 +49,7 @@ def launch_gui(board):
 
 def main():
     p = argparse.ArgumentParser(description="Run/benchmark Pips solvers")
-    p.add_argument("--solver", choices=["csp", "anneal", "all"], default="all")
+    p.add_argument("--solver", choices=["csp", "anneal", "astar", "all"], default="all")
     p.add_argument("--file", help="Path to a single JSON puzzle file")
     p.add_argument("--difficulty", choices=["easy", "medium", "hard"], default="easy")
     p.add_argument("--repeat", type=int, default=1, help="How many times to run (for averages)")
@@ -84,7 +87,7 @@ def main():
         )
         return
 
-    solvers = ["csp", "anneal"] if args.solver == "all" else [args.solver]
+    solvers = ["csp", "anneal", "astar"] if args.solver == "all" else [args.solver]
 
     summary = {}
 
