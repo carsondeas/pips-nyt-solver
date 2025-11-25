@@ -2,32 +2,6 @@ import random
 import math
 
 
-# generate all possible placements for each domino
-def generate_all_placements(board):
-    R, C = board.rows, board.cols
-    placements_per_domino = []
-
-    for domino in board.dominoes:
-        a, b = domino.values
-        options = []
-
-        for r in range(R):
-            for c in range(C):
-                # horizontal
-                if c + 1 < C:
-                    options.append(((r, c), (r, c+1), (a, b)))
-                    options.append(((r, c), (r, c+1), (b, a)))
-
-                # vertical
-                if r + 1 < R:
-                    options.append(((r, c), (r+1, c), (a, b)))
-                    options.append(((r, c), (r+1, c), (b, a)))
-
-        placements_per_domino.append(options)
-
-    return placements_per_domino
-
-
 # get the penalty for the region
 def region_energy(region, grid):
 
@@ -122,9 +96,7 @@ def solve_pips(board,
                max_iters=300000,
                restarts=12):
 
-    placement_options = [
-        board.generate_domino_placements(d) for d in board.dominoes
-    ]
+    placement_options = board.generate_all_domino_placements()
 
     best_global = None
     best_global_energy = float("inf")
