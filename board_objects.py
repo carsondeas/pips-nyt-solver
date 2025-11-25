@@ -61,6 +61,10 @@ class Board:
 
         return placements
 
+    def generate_all_domino_placements(self):
+        """All placements for every domino, honoring valid puzzle cells (skip holes)."""
+        return [self.generate_domino_placements(d) for d in self.dominoes]
+
     def __repr__(self):
         return (
             f"Board(size={self.rows}x{self.cols}, "

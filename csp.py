@@ -63,31 +63,7 @@ def solve_pips(board):
     # only cells that belong to the puzzle are valid; the bounding box may include holes
     valid_cells = set(region_map.keys())
 
-    # generate all domino placements restricted to valid cells
-    def generate_domino_placements(domino):
-        a, b = domino.values
-        placements = []
-
-        for (r, c) in valid_cells:
-            right = (r, c + 1)
-            down = (r + 1, c)
-
-            # horizontal
-            if right in valid_cells:
-                placements.append(((r, c), right, (a, b)))
-                placements.append(((r, c), right, (b, a)))
-
-            # vertical
-            if down in valid_cells:
-                placements.append(((r, c), down, (a, b)))
-                placements.append(((r, c), down, (b, a)))
-
-        return placements
-
-    all_placements = [
-        generate_domino_placements(d) for d in dominoes
-    ]
-
+    all_placements = board.generate_all_domino_placements()
 
     # create direct lookup of each region's cells 
     region_cells = {}
