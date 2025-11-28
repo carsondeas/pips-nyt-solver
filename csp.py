@@ -1,30 +1,76 @@
 from functools import lru_cache
+from collections import Counter
 
 # check for partial placements
-def region_ok_partial(region, values):
+def region_ok_partial(region, values, unused_values):
     t = region.type
     target = region.target
+    total_cells = len(region.cells)
+    used_cells = len(values)
+    remaining = total_cells - used_cells
 
     if t == "empty":
         return True
 
     if t == "equals":
-        # all values must be the same
-        return len(set(values)) <= 1
+        # determine target value
+        if len(values) > 1 and len(set(values)) > 1:
+            return False
+
+        if len(values) == 0:
+            return True 
+
+        val = values[0]
+
+        # check if there are enough remaining unused values
+        if unused_values[val] < remaining:
+            return False
+
+        return True
 
     if t == "notequals":
-        # all values must differ
-        return len(values) == len(set(values))
+        # used values must be unique
+        if len(values) != len(set(values)):
+            return False
+
+        # check if enough distinct unused values exist
+        used_set = set(values)
+        distinct_available = 0
+        for v, count in unused_values.items():
+            if count > 0 and v not in used_set:
+                distinct_available += 1
+
+        if distinct_available < remaining:
+            return False
+
+        return True
+
+    
+    # Compute best-case min & max sums using unused values
+    all_unused = []
+    for val, cnt in unused_values.items():
+        all_unused.extend([val] * cnt)
+
+    # If not enough values left globally to fill the region, fail
+    if len(all_unused) < remaining:
+        return False
+
+    # smallest possible fill:
+    min_fill = sum(sorted(all_unused)[:remaining])
+    # largest possible fill
+    max_fill = sum(sorted(all_unused, reverse=True)[:remaining])
+    current_sum = sum(values)
+    min_possible = current_sum + min_fill
+    max_possible = current_sum + max_fill
 
     if t == "less":
-        return all(v < target for v in values)
+        return min_possible < target
 
     if t == "greater":
-        return all(v > target for v in values)
+        return max_possible > target
 
     if t == "sum":
-        # partial sums fine as long as we dont exceed target
-        return sum(values) <= target
+        return min_possible <= target and max_possible >= target
 
     return True
 
@@ -42,14 +88,16 @@ def region_ok_full(region, values):
     if t == "notequals":
         return len(values) == len(set(values))
 
+    total = sum(values)
+
     if t == "less":
-        return all(v < target for v in values)
+        return total < target
 
     if t == "greater":
-        return all(v > target for v in values)
+        return total > target
 
     if t == "sum":
-        return sum(values) == target
+        return total == target
 
     return True
 
@@ -76,6 +124,12 @@ def solve_pips(board):
 
     grid = {} 
     used = [False] * len(dominoes)
+
+    unused_values = Counter()
+    for d in dominoes:
+        a, b = d.values
+        unused_values[a] += 1
+        unused_values[b] += 1
 
 
     # choose next domino with fewest remaining placements
@@ -105,7 +159,7 @@ def solve_pips(board):
             # if both halves share the same region, include the second value
             if reg1 is region_cells.get(c2):
                 vals.append(v2)
-            if not region_ok_partial(reg1, vals):
+            if not region_ok_partial(reg1, vals, unused_values):
                 return False
 
         # cell 2 check
@@ -113,7 +167,7 @@ def solve_pips(board):
         if reg2 and reg2 is not reg1:
             vals = [grid[c] for c in reg2.cells if c in grid]
             vals.append(v2)
-            if not region_ok_partial(reg2, vals):
+            if not region_ok_partial(reg2, vals, unused_values):
                 return False
 
         return True
@@ -186,6 +240,9 @@ def solve_pips(board):
             grid[c1] = v1
             grid[c2] = v2
 
+            unused_values[v1] -= 1
+            unused_values[v2] -= 1
+
             # forward checking
             removed = forward_check(d)
             if removed is not None:
@@ -194,6 +251,9 @@ def solve_pips(board):
                     return True
                 # undo forward checking
                 undo_forward_check(removed)
+            
+            unused_values[v1] += 1
+            unused_values[v2] += 1
 
             # undo placement
             del grid[c1]
