@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 import multiprocessing as mp
+import random
 
 
 def _solver_worker(solver_fn, puzzle, conn):
@@ -23,7 +24,7 @@ def _solver_worker(solver_fn, puzzle, conn):
         conn.close()
 
 
-def timed_solve(solver_fn, puzzle, timeout=3):
+def timed_solve(solver_fn, puzzle, timeout=60):
     """
     Run solver in a separate process and terminate
     if it exceeds timeout seconds.
@@ -47,7 +48,16 @@ def timed_solve(solver_fn, puzzle, timeout=3):
     p.join()
     return None, timeout
 
-def evaluate_solvers(boards_dir):
+def evaluate_solvers(boards_dir, sample_size=1000):
+
+    # gather all available json boards
+    all_files = list(Path(boards_dir).glob("*.json"))
+    if len(all_files) == 0:
+        print("No boards found.")
+        return None
+
+    # sample 50 random boards (or fewer if we don't have 50)
+    sample = random.sample(all_files, min(sample_size, len(all_files)))
 
     results = {
         "backtracking": {"times": [], "dates": [], "solved": 0},
@@ -57,7 +67,7 @@ def evaluate_solvers(boards_dir):
     failed_backtracking = []
     failed_annealing   = []
 
-    for file in Path(boards_dir).glob("*.json"):
+    for file in sample:
 
         try:
             with open(file, "r") as f:
@@ -74,7 +84,7 @@ def evaluate_solvers(boards_dir):
             continue
 
         # loop through difficulties
-        for difficulty in ["easy", "medium"]:
+        for difficulty in ["easy", "medium", "hard"]:
             if difficulty not in data:
                 continue
 
