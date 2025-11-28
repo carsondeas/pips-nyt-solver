@@ -94,14 +94,29 @@ def solve_pips(board,
                T_start=5.0,
                cooling=0.9995,
                max_iters=300000,
-               restarts=12):
+               restarts=12,
+               return_stats=False):
 
     placement_options = board.generate_all_domino_placements()
 
     best_global = None
     best_global_energy = float("inf")
+    stats = None
+    if return_stats:
+        stats = {
+            "restarts": 0,
+            "iterations": 0,
+            "accepted": 0,
+            "accepted_worse": 0,
+            "best_energy": float("inf"),
+            "final_energy": None,
+            "final_temperature": None,
+        }
 
     for restart in range(restarts):
+
+        if stats is not None:
+            stats["restarts"] += 1
 
         state = random_initial_state(placement_options)
         energy = compute_energy(state, board)
@@ -109,10 +124,15 @@ def solve_pips(board,
         T = T_start
 
         for it in range(max_iters):
+            if stats is not None:
+                stats["iterations"] += 1
 
             # if perfect solution
             if energy == 0:
-                return state_to_grid(state)
+                if stats is not None:
+                    stats["final_energy"] = 0
+                    stats["final_temperature"] = T
+                return (state_to_grid(state), stats) if return_stats else state_to_grid(state)
 
             # neighbor
             neighbor = random_neighbor(state, placement_options)
@@ -121,9 +141,14 @@ def solve_pips(board,
             # accept if better or sometimes if worse
             if e2 < energy:
                 state, energy = neighbor, e2
+                if stats is not None:
+                    stats["accepted"] += 1
             else:
                 if random.random() < math.exp((energy - e2) / T):
                     state, energy = neighbor, e2
+                    if stats is not None:
+                        stats["accepted"] += 1
+                        stats["accepted_worse"] += 1
 
             T *= cooling
 
@@ -131,6 +156,13 @@ def solve_pips(board,
         if energy < best_global_energy:
             best_global_energy = energy
             best_global = state
+            if stats is not None:
+                stats["best_energy"] = energy
 
     # only return if solved
-    return state_to_grid(best_global) if best_global_energy == 0 else None
+    if stats is not None:
+        stats["final_energy"] = best_global_energy if best_global_energy != float("inf") else None
+        stats["final_temperature"] = T
+    if best_global_energy == 0:
+        return (state_to_grid(best_global), stats) if return_stats else state_to_grid(best_global)
+    return (None, stats) if return_stats else None

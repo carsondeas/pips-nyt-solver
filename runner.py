@@ -14,13 +14,33 @@ from board_play import run_pygame_visualizer
 def run_solver_once(board, solver_name):
     start = time.perf_counter()
     if solver_name == "csp":
-        result = csp_solver.solve_pips(board)
+        result, stats = csp_solver.solve_pips(board, return_stats=True)
     elif solver_name == "anneal":
-        result = sa_solver.solve_pips(board)
+        result, stats = sa_solver.solve_pips(board, return_stats=True)
     else:
         raise ValueError(f"Unknown solver: {solver_name}")
     elapsed = time.perf_counter() - start
-    return {"solver": solver_name, "solved": result is not None, "time": elapsed}
+    return {
+        "solver": solver_name,
+        "solved": result is not None,
+        "time": elapsed,
+        "stats": stats,
+    }
+
+
+def mean_numeric_stats(stats_list):
+    """Compute mean of numeric fields across a list of stat dicts."""
+    if not stats_list:
+        return {}
+    keys = set()
+    for s in stats_list:
+        keys.update(s.keys())
+    means = {}
+    for k in sorted(keys):
+        vals = [s[k] for s in stats_list if isinstance(s.get(k), (int, float))]
+        if vals:
+            means[k] = sum(vals) / len(vals)
+    return means
 
 
 def load_board_from_args(args):
@@ -91,12 +111,15 @@ def main():
     for solver in solvers:
         times = []
         solves = 0
+        stats_list = []
 
         for i in range(args.repeat):
             res = run_solver_once(board, solver)
             times.append(res["time"])
             if res["solved"]:
                 solves += 1
+            if res.get("stats"):
+                stats_list.append(res["stats"])
             print(f"Run {i+1}/{args.repeat} - {solver}: solved={res['solved']} time={res['time']:.4f}s")
 
         summary[solver] = {
@@ -105,6 +128,7 @@ def main():
             "time_mean": statistics.mean(times) if times else None,
             "time_min": min(times) if times else None,
             "time_max": max(times) if times else None,
+            "stats_mean": mean_numeric_stats(stats_list),
         }
 
     print("\n=== Summary ===")
@@ -113,6 +137,10 @@ def main():
         print(f"  runs: {info['runs']}")
         print(f"  solved: {info['solved_count']}/{info['runs']}")
         print(f"  time mean: {info['time_mean']:.4f}s min: {info['time_min']:.4f}s max: {info['time_max']:.4f}s")
+        if info.get("stats_mean"):
+            print("  stats (mean):")
+            for k, v in info["stats_mean"].items():
+                print(f"    {k}: {v:.2f}")
 
 
 if __name__ == '__main__':
