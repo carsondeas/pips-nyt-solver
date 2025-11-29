@@ -12,6 +12,7 @@ def region_energy(region, grid):
 
     t = region.type
     target = region.target
+    s = sum(vals)
 
     if t == "empty":
         return 0
@@ -23,16 +24,15 @@ def region_energy(region, grid):
         return 0 if len(vals) == len(set(vals)) else 1
 
     if t == "less":
-        return sum(1 for v in vals if not (v < target))
+        return 0 if s < target else 1
 
     if t == "greater":
-        return sum(1 for v in vals if not (v > target))
+        return 0 if s > target else 1
 
     if t == "sum":
-        return abs(sum(vals) - target)
+        return abs(s - target)
 
     return 0
-
 
 # used to compute the penalty of a state
 def compute_energy(state, board): 
