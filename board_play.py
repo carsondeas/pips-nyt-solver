@@ -6,7 +6,7 @@ from board_objects import Board
 from csp import solve_pips as solve_csp
 from simulated_annealing import solve_pips as solve_anneal
 
-
+## Used AI to assist in coding this file.
 class SimpleBoardVisualizer:
     
     def __init__(self, board, cell_size=100):
@@ -147,7 +147,6 @@ class SimpleBoardVisualizer:
         return '?'
     
     def _draw_dominoes(self):
-        # show unplaced dominoes at bottom
         y_start = self.board.rows * self.cell_size + 20
         dw = 90
         dh = 52
@@ -168,7 +167,6 @@ class SimpleBoardVisualizer:
             pygame.draw.rect(self.screen, self.COLORS['white'], rect)
             pygame.draw.rect(self.screen, self.COLORS['black'], rect, 3, border_radius=5)
 
-            # divider line
             mid = x + dw // 2
             pygame.draw.line(self.screen, self.COLORS['black'], (mid, y), (mid, y + dh), 2)
 
@@ -276,7 +274,6 @@ class SimpleBoardVisualizer:
         self.current_domino_id = dom_id
         self.step_index = idx
 
-        # rebuild placed set up to this step
         placed = set()
         for a, _g, _p, d_id in self.steps[:idx + 1]:
             if a == 'place' and d_id is not None:
