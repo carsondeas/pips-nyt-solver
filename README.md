@@ -1,5 +1,6 @@
 # Pips NYT Solver
 Solver for the New York Times Pips domino puzzle. Includes a CSP backtracking solver with heuristics, a simulated annealing local search, visualizers, and benchmarking scripts.
+This project was made by Carson, Alison, Dana, and Tianyi for CS4100.
 
 ## Install and puzzle data
 - Python 3.10+ recommended.
