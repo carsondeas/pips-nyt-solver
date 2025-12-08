@@ -1,22 +1,27 @@
 import json
+import sys
 import time
 from pathlib import Path
 from statistics import mean
 
 import matplotlib.pyplot as plt
 
-import simulated_annealing as sa
-from load_board import parse_pips_json
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+import simulated_annealing as sa  # noqa: E402
+from load_board import parse_pips_json  # noqa: E402
 
 DAYS_OF_DATA = 60  # last 2 months of daily boards
 
 
 class SaRunner:
-    def __init__(self, boards_dir="all_boards", difficulties=None, output_dir="plots"):
-        self.boards_dir = Path(boards_dir)
+    def __init__(self, boards_dir=None, difficulties=None, output_dir=None):
+        self.boards_dir = Path(boards_dir) if boards_dir else ROOT / "all_boards"
         self.difficulties = difficulties or ["easy", "medium", "hard"]
-        self.output_dir = Path(output_dir)
-        self.output_dir.mkdir(exist_ok=True)
+        self.output_dir = Path(output_dir) if output_dir else Path(__file__).resolve().parent / "plots"
+        self.output_dir.mkdir(parents=True, exist_ok=True)
         self.results = {d: [] for d in self.difficulties}
         self.failures = {d: [] for d in self.difficulties}
 

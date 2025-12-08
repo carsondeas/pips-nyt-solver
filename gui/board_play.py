@@ -2,9 +2,15 @@ import pygame
 import sys
 from typing import Dict, List, Optional, Tuple
 import time
-from board_objects import Board
-from csp import solve_pips as solve_csp
-from simulated_annealing import solve_pips as solve_anneal
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from board_objects import Board  # noqa: E402
+from csp import solve_pips as solve_csp  # noqa: E402
+from simulated_annealing import solve_pips as solve_anneal  # noqa: E402
 
 ## Used AI to assist in coding this file.
 class SimpleBoardVisualizer:

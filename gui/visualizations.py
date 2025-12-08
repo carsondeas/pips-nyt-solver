@@ -1,11 +1,16 @@
 from pathlib import Path
+import sys
 
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from matplotlib.colors import to_rgba
 import numpy as np
 
-from load_board import parse_pips_json
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from load_board import parse_pips_json  # noqa: E402
 
 
 class PipsVisualizer:

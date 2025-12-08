@@ -1,7 +1,21 @@
+import sys
+from pathlib import Path
+
 import matplotlib.pyplot as plt
 
-from csp_benchmark import csp
-from sa_benchmark import anneal
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+if __package__:
+    from .csp_benchmark import CspRunner  # type: ignore  # noqa: E402
+    from .sa_benchmark import SaRunner  # type: ignore  # noqa: E402
+else:
+    from csp_benchmark import CspRunner  # noqa: E402
+    from sa_benchmark import SaRunner  # noqa: E402
+
+PLOT_DIR = Path(__file__).resolve().parent / "plots"
+PLOT_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def combined_bar(data, title, ylabel, fname):
@@ -20,14 +34,14 @@ def combined_bar(data, title, ylabel, fname):
     ax.set_title(title)
     ax.legend()
     plt.tight_layout()
-    plt.savefig(f"plots/{fname}", dpi=200)
+    plt.savefig(PLOT_DIR / fname, dpi=200)
     plt.close()
-    print(f"Saved {fname} to plots/")
+    print(f"Saved {fname} to {PLOT_DIR}/")
 
 
 def main():
-    csp_runner = csp()
-    sa_runner = anneal()
+    csp_runner = CspRunner(output_dir=PLOT_DIR)
+    sa_runner = SaRunner(output_dir=PLOT_DIR)
 
     csp_runner.run()
     sa_runner.run()

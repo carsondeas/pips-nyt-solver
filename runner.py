@@ -8,7 +8,7 @@ from pathlib import Path
 from load_board import parse_pips_json, get_random_pips_game
 import csp as csp_solver
 import simulated_annealing as sa_solver
-from board_play import run_pygame_visualizer
+from gui.board_play import run_pygame_visualizer
 
 
 def run_solver_once(board, solver_name):
@@ -54,7 +54,7 @@ def load_board_from_args(args):
 
 def launch_gui(board):
     """Load and run the interactive visualizer with a provided board."""
-    viz_path = Path(__file__).parent / "step-by-step visualizer.py"
+    viz_path = Path(__file__).parent / "gui" / "step-by-step visualizer.py"
     spec = importlib.util.spec_from_file_location("step_by_step_visualizer", viz_path)
     if spec is None or spec.loader is None:
         raise ImportError("Could not load visualizer module")
