@@ -1,9 +1,15 @@
 from pathlib import Path
-from load_board import parse_pips_json
-from csp import solve_pips  # Use the actual working solver!
+import sys
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import copy
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from load_board import parse_pips_json  # noqa: E402
+from csp import solve_pips  # Use the actual working solver!  # noqa: E402
 
 
 class PipsVisualizer:

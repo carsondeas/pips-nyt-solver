@@ -1,16 +1,22 @@
 from pathlib import Path
 import json
 from statistics import mean, median
-from load_board import parse_pips_json
+import sys
 import time
 from datetime import datetime
-from csp import solve_pips as solve_pips_csp
-from simulated_annealing import solve_pips as solve_pips_sa
 import matplotlib.pyplot as plt
 import numpy as np
 import os
 import multiprocessing as mp
 import random
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from load_board import parse_pips_json  # noqa: E402
+from csp import solve_pips as solve_pips_csp  # noqa: E402
+from simulated_annealing import solve_pips as solve_pips_sa  # noqa: E402
 
 
 def _solver_worker(solver_fn, puzzle, conn):
@@ -141,8 +147,9 @@ def summarize(results):
 
 
 # plot
-PLOT_DIR = Path("plots")
-PLOT_DIR.mkdir(exist_ok=True)
+METRICS_DIR = Path(__file__).resolve().parent
+PLOT_DIR = METRICS_DIR / "plots"
+PLOT_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def save_plot(name):
@@ -211,7 +218,7 @@ def plot_middle_90_percent_by_date(results):
 
     save_plot("middle_90_percent_by_date")
 
-RESULTS_CACHE = Path("cached_results.json")
+RESULTS_CACHE = METRICS_DIR / "cached_results.json"
 
 def save_results(results, failed_bt, failed_sa):
     data = {
@@ -257,7 +264,7 @@ def main():
         results, failed_bt, failed_sa = cached
     else:
         print("No cache found. Running solvers...")
-        results, failed_bt, failed_sa = evaluate_solvers(Path("all_boards"))
+        results, failed_bt, failed_sa = evaluate_solvers(ROOT / "all_boards")
         save_results(results, failed_bt, failed_sa)
 
     summarize(results)
@@ -275,7 +282,7 @@ def main():
     for item in failed_sa:
         print("  ", item)
 
-    print("\nPlots saved in:  plots/\n")
+    print(f"\nPlots saved in:  {PLOT_DIR}\n")
 
 
 
