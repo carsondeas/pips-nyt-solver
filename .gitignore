@@ -12,3 +12,5 @@ pip-delete-this-directory.txt
 
 .env
 visualization.ipynb
+
+.ipynb_checkpoints/
