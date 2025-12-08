@@ -56,10 +56,11 @@ python runner.py --solver csp --pygame
   `python runner.py --solver all --difficulty easy --file all_boards/2025-11-14.json`
 
 ## Visualizers
-- **Matplotlib stepper** (page through placements):  
-  `python runner.py --gui --file all_boards/2025-11-14.json`
-- **Pygame board/player** (grid, constraint labels, domino tray, optional autoplay):  
-  `python runner.py --pygame --solver csp --auto --auto-delay 0.25 --cell-size 90`
+- **Pygame board/player** (grid, constraints, domino tray):  
+  `python runner.py --pygame --solver csp`
+- **Matplotlib stepper** (go through placements):  
+  `python runner.py --gui`
+
 
 ## Benchmarks and plots
 - Full comparison (writes PNGs to `metrics/plots/`):  
@@ -73,7 +74,7 @@ python runner.py --solver csp --pygame
 Puzzle files live at `all_boards/YYYY-MM-DD.json` and contain sections `easy`, `medium`, `hard`:
 ```json
 {
-  "dominoes": [[0,0],[0,1], ...],       // 28 domino halves
+  "dominoes": [[0,0],[0,1], ...],
   "regions": [
     {"indices": [[0,0],[0,1]], "type": "sum", "target": 5},
     {"indices": [[1,0],[1,1]], "type": "notequals"}
