@@ -63,15 +63,20 @@ python runner.py --solver csp --pygame
 
 
 ## Benchmarks and plots
-- Full comparison (writes PNGs to `metrics/plots/`):  
+- Full comparison (writes PNGs to `metrics/plots/`):
   `python -m metrics.compare_benchmarks`
-- Single-solver sweeps:  
-  `python -m metrics.csp_benchmark`  
+- Single-solver runs:
+  `python -m metrics.csp_benchmark`
   `python -m metrics.sa_benchmark`
-- Cached aggregate results: `metrics/cached_results.json`
 
-## Data (puzzle format)
-Puzzle files live at `all_boards/YYYY-MM-DD.json` and contain sections `easy`, `medium`, `hard`:
+## How it works
+- `load_board.py`: reads NYT JSON into `Board`, `Domino`, `Region`.
+- `csp.py`: backtracking with domain ordering, forward checking, and region-constraint checks; reports nodes/backtracks/prunes.
+- `simulated_annealing.py`: random init, overlap/constraint energy, multiple restarts.
+- `runner.py`: CLI that puts solvers, averaging, and visualizers in the command line.
+
+## Puzzle data format
+`all_boards/YYYY-MM-DD.json` contains sections `easy`, `medium`, `hard`:
 ```json
 {
   "dominoes": [[0,0],[0,1], ...],
@@ -81,12 +86,12 @@ Puzzle files live at `all_boards/YYYY-MM-DD.json` and contain sections `easy`, `
   ]
 }
 ```
-Cells are zero-based `(row, col)`. Region types: `equals`, `notequals`, `sum`, `less`, `greater`, `empty`.
+Cells use zero-based `(row, col)`. Region types: `equals`, `notequals`, `sum`, `less`, `greater`, `empty`.
 
-## Repo guide
-- `board_objects.py`, `load_board.py` core data structures and JSON loader
-- `csp.py`, `simulated_annealing.py` solvers
-- `runner.py` CLI entrypoint and visualizer hooks
-- `gui/` matplotlib and pygame visualizers
-- `metrics/` benchmarking and plotting utilities; outputs in `metrics/plots/`
-- `fetch-all-boards.sh` download helper for daily NYT puzzles
+## Repo map
+- `board_objects.py` / `load_board.py`: core structures and loader.
+- `csp.py`, `simulated_annealing.py`: solvers.
+- `runner.py`: CLI entrypoint + visualizer hooks.
+- `gui/`: matplotlib and pygame visualizers.
+- `metrics/`: benchmarking and plotting utilities; outputs in `metrics/plots/`.
+- `fetch-all-boards.sh`: downloads NYT puzzles into `all_boards/`.
