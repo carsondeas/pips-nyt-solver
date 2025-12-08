@@ -1,19 +1,15 @@
 import json
-import sys
 import time
 from pathlib import Path
 from statistics import mean
 
 import matplotlib.pyplot as plt
 
+import csp
+from load_board import parse_pips_json
+
 ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
-
-import csp  # noqa: E402
-from load_board import parse_pips_json  # noqa: E402
-
-DAYS_OF_DATA = 60  # last 2 months of daily boards
+DAYS_OF_DATA = 3  # last N days of boards
 
 
 class CspRunner:
@@ -22,23 +18,24 @@ class CspRunner:
         self.difficulties = difficulties or ["easy", "medium", "hard"]
         self.output_dir = Path(output_dir) if output_dir else Path(__file__).resolve().parent / "plots"
         self.output_dir.mkdir(parents=True, exist_ok=True)
+        # each entry: {"time": float, "steps": int}
         self.results = {d: [] for d in self.difficulties}
         self.failures = {d: [] for d in self.difficulties}
 
     def solve_board(self, board):
         start = time.perf_counter()
         try:
-            solution = csp.solve_pips(board)
+            solution, stats = csp.solve_pips(board, return_stats=True)
         except Exception:
-            solution = None
+            solution, stats = None, None
         elapsed = time.perf_counter() - start
-        return solution, elapsed
+        return solution, elapsed, stats
 
     def run(self):
         if not self.boards_dir.exists():
             raise FileNotFoundError(f"Boards directory not found: {self.boards_dir}")
 
-        files = sorted(self.boards_dir.glob("*.json"))[-DAYS_OF_DATA:]  # last ~2 months of daily boards
+        files = sorted(self.boards_dir.glob("*.json"))[-DAYS_OF_DATA:]
         total_tasks = len(files) * len(self.difficulties)
         done = 0
         for puzzle_file in files:
@@ -60,32 +57,50 @@ class CspRunner:
                     continue
 
                 done += 1
-                start_msg = f"[{done}/{total_tasks}] {puzzle_file.name}:{diff} ..."
+                start_msg = f"[CSP {done}/{total_tasks}] {puzzle_file.name}:{diff} ..."
                 print(start_msg, end="\r", flush=True)
-                solution, elapsed = self.solve_board(board)
+                solution, elapsed, stats = self.solve_board(board)
 
                 status = "ok" if solution is not None else "FAILED"
-                finish_msg = f"[{done}/{total_tasks}] {puzzle_file.name}:{diff} {status} {elapsed:.2f}s"
+                steps = stats.get("steps") if stats else None
+                step_txt = f" steps={steps}" if steps is not None else ""
+                finish_msg = f"[CSP {done}/{total_tasks}] {puzzle_file.name}:{diff} {status} {elapsed:.2f}s{step_txt}"
                 print(finish_msg.ljust(len(start_msg)), end="\n", flush=True)
 
+                steps = stats.get("steps") if stats else None
+
                 if solution is not None:
-                    self.results[diff].append(elapsed)
+                    self.results[diff].append({"time": elapsed, "steps": steps})
                 else:
+                    # track failure
                     self.failures[diff].append(puzzle_file.name)
 
         print()  # newline after progress
 
     def mean_times(self):
-        return {diff: mean(times) if times else None for diff, times in self.results.items()}
+        return {
+            diff: mean([r["time"] for r in runs]) if runs else None
+            for diff, runs in self.results.items()
+        }
+
+    def mean_steps(self):
+        means = {}
+        for diff, runs in self.results.items():
+            step_vals = [r["steps"] for r in runs if r.get("steps") is not None]
+            means[diff] = mean(step_vals) if step_vals else None
+        return means
 
     def summarize(self):
         for diff in self.difficulties:
-            times = self.results[diff]
-            solved = len(times)
+            times = [r["time"] for r in self.results[diff]]
+            steps = [r["steps"] for r in self.results[diff] if r.get("steps") is not None]
+            solved = len(self.results[diff])
             failed = len(self.failures[diff])
             print(f"{diff}: solved {solved}, failed {failed}")
             if times:
                 print(f"  mean time: {mean(times):.4f}s, fastest: {min(times):.4f}s, slowest: {max(times):.4f}s")
+            if steps:
+                print(f"  mean steps: {mean(steps):.0f}, fastest: {min(steps):.0f}, slowest: {max(steps):.0f}")
             if self.failures[diff]:
                 print(f"  failed boards: {', '.join(self.failures[diff])}")
 

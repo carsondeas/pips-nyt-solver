@@ -293,6 +293,9 @@ def solve_pips(board, return_stats=False):
 
     # start dfs
     solved = dfs()
+    if stats is not None:
+        # placements_tried represents our step count for reporting
+        stats["steps"] = stats.get("placements_tried", 0)
     if return_stats:
         return (solution if solved else None, stats)
     return solution if solved else None

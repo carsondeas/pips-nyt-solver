@@ -46,6 +46,7 @@ python runner.py --solver csp --pygame
 - `--auto-delay FLOAT` (pygame) delay between autoplay steps in seconds
 - `--cell-size INT` (pygame) cell size in pixels (default 100)
 - `--debug` (pygame) print solver mapping for debugging
+- `--stats {csp, anneal, compare}` run benchmarks over recent boards in `all_boards/` and print summaries (time, steps/iterations, restarts, success).
 
 ## Usage examples
 - CSP on a specific medium board:  
@@ -54,6 +55,12 @@ python runner.py --solver csp --pygame
   `python runner.py --solver anneal --difficulty hard --repeat 3`
 - Compare both solvers back-to-back on easy:  
   `python runner.py --solver all --difficulty easy --file all_boards/2025-11-14.json`
+- Benchmark stats only (no plotting):  
+  `python runner.py --stats csp`  
+  `python runner.py --stats anneal`  
+  `python runner.py --stats compare`
+
+Stat runs use the most recent boards in `all_boards/` (controlled by `DAYS_OF_DATA` in `metrics/csp_benchmark.py` and `metrics/sa_benchmark.py`). Adjust that constant to change how many days of the most recent puzzles are included.
 
 ## Visualizers
 - **Pygame board/player** (grid, constraints, domino tray):  

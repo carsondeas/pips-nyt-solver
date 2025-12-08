@@ -10,13 +10,11 @@ import os
 import multiprocessing as mp
 import random
 
-ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
+from load_board import parse_pips_json
+from csp import solve_pips as solve_pips_csp
+from simulated_annealing import solve_pips as solve_pips_sa
 
-from load_board import parse_pips_json  # noqa: E402
-from csp import solve_pips as solve_pips_csp  # noqa: E402
-from simulated_annealing import solve_pips as solve_pips_sa  # noqa: E402
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def _solver_worker(solver_fn, puzzle, conn):

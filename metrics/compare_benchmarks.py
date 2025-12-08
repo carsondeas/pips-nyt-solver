@@ -1,18 +1,10 @@
-import sys
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 
-ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
+from metrics.csp_benchmark import CspRunner
+from metrics.sa_benchmark import SaRunner
 
-if __package__:
-    from .csp_benchmark import CspRunner  # type: ignore  # noqa: E402
-    from .sa_benchmark import SaRunner  # type: ignore  # noqa: E402
-else:
-    from csp_benchmark import CspRunner  # noqa: E402
-    from sa_benchmark import SaRunner  # noqa: E402
 
 PLOT_DIR = Path(__file__).resolve().parent / "plots"
 PLOT_DIR.mkdir(parents=True, exist_ok=True)
@@ -22,8 +14,15 @@ def combined_bar(data, title, ylabel, fname):
     diffs = ["easy", "medium", "hard"]
     width = 0.35
     x = list(range(len(diffs)))
-    csp_vals = [data["csp"].get(d) for d in diffs]
-    sa_vals = [data["sa"].get(d) for d in diffs]
+    def _safe_vals(side: str):
+        vals = []
+        for d in diffs:
+            v = data[side].get(d)
+            vals.append(float("nan") if v is None else v)
+        return vals
+
+    csp_vals = _safe_vals("csp")
+    sa_vals = _safe_vals("sa")
 
     fig, ax = plt.subplots(figsize=(6, 4))
     ax.bar([i - width / 2 for i in x], csp_vals, width, label="CSP", color="#4c72b0")
@@ -45,6 +44,10 @@ def main():
 
     csp_runner.run()
     sa_runner.run()
+
+    # Per-solver plots (time + annealing iterations)
+    csp_runner.plot_mean_times()
+    sa_runner.plot_mean_times()
 
     mean_times = {
         "csp": csp_runner.mean_times(),

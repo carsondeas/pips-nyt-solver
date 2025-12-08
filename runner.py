@@ -9,6 +9,9 @@ from load_board import parse_pips_json, get_random_pips_game
 import csp as csp_solver
 import simulated_annealing as sa_solver
 from gui.board_play import run_pygame_visualizer
+from metrics.csp_benchmark import CspRunner
+from metrics.sa_benchmark import SaRunner
+from metrics.compare_benchmarks import main as compare_benchmarks_main
 
 
 def run_solver_once(board, solver_name):
@@ -77,11 +80,34 @@ def main():
     p.add_argument("--auto-delay", type=float, default=0.5, help="(pygame) Autoplay step delay in seconds")
     p.add_argument("--cell-size", type=int, default=100, help="(pygame) Cell size in pixels")
     p.add_argument("--debug", action="store_true", help="(pygame) Print solver mapping for debugging")
+    p.add_argument(
+        "--stats",
+        choices=["csp", "anneal", "compare"],
+        help="Run benchmark stats/plots instead of a single solve",
+    )
 
     args = p.parse_args()
 
     if args.seed is not None:
         random.seed(args.seed)
+
+    # Stats/benchmark mode
+    if args.stats:
+        if args.stats == "csp":
+            runner = CspRunner()
+            runner.run()
+            runner.summarize()
+            runner.plot_mean_times()
+            runner.plot_success_rates()
+        elif args.stats == "anneal":
+            runner = SaRunner()
+            runner.run()
+            runner.summarize()
+            runner.plot_mean_times()
+            runner.plot_success_rates()
+        elif args.stats == "compare":
+            compare_benchmarks_main()
+        return
 
     board = load_board_from_args(args)
 
@@ -120,7 +146,10 @@ def main():
                 solves += 1
             if res.get("stats"):
                 stats_list.append(res["stats"])
-            print(f"Run {i+1}/{args.repeat} - {solver}: solved={res['solved']} time={res['time']:.4f}s")
+            step_info = ""
+            if res.get("stats") and res["stats"].get("steps") is not None:
+                step_info = f" steps={int(res['stats']['steps'])}"
+            print(f"Run {i+1}/{args.repeat} - {solver}: solved={res['solved']} time={res['time']:.4f}s{step_info}")
 
         summary[solver] = {
             "runs": args.repeat,
