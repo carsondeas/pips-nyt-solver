@@ -102,8 +102,7 @@ def region_ok_full(region, values):
     return True
 
 
-def solve_pips(board):
-    R, C = board.rows, board.cols
+def solve_pips(board, return_stats=False):
     dominoes = board.dominoes
     regions = board.regions
     region_map = board.region_map
@@ -124,7 +123,18 @@ def solve_pips(board):
 
     grid = {} 
     used = [False] * len(dominoes)
+    solution = None
 
+    stats = None
+    if return_stats:
+        stats = {
+            "nodes": 0,
+            "placements_tried": 0,
+            "backtracks": 0,
+            "pruned": 0,
+            "constraint_checks": 0,
+            "max_depth": 0,
+        }
     unused_values = Counter()
     for d in dominoes:
         a, b = d.values
@@ -147,6 +157,9 @@ def solve_pips(board):
 
     # attempt placement and check validity
     def placement_is_valid(c1, c2, v1, v2):
+        if stats is not None:
+            stats["constraint_checks"] += 1
+
         # both halves must be on valid puzzle cells
         if c1 not in valid_cells or c2 not in valid_cells:
             return False
@@ -200,6 +213,8 @@ def solve_pips(board):
                 new_domain.append(placement)
 
             if removed_i:
+                if stats is not None:
+                    stats["pruned"] += len(removed_i)
                 removed.append((i, removed_i))
                 remaining_domains[i] = new_domain
 
@@ -211,7 +226,13 @@ def solve_pips(board):
             remaining_domains[idx].extend(items)
 
 
-    def dfs(valid_cells=valid_cells):
+    def dfs(depth=0, valid_cells=valid_cells):
+        nonlocal solution
+
+        if stats is not None:
+            stats["nodes"] += 1
+            stats["max_depth"] = max(stats["max_depth"], depth)
+
         if all(used):
             # ensure complete coverage and all regions satisfied
             if len(grid) != len(valid_cells) or set(grid.keys()) != valid_cells:
@@ -220,6 +241,7 @@ def solve_pips(board):
                 vals = [grid[c] for c in region.cells]
                 if not region_ok_full(region, vals):
                     return False
+            solution = dict(grid)
             return True
 
         d = select_domino()
@@ -228,6 +250,9 @@ def solve_pips(board):
         placements = remaining_domains[d]
 
         for (c1, c2, vals) in placements:
+            if stats is not None:
+                stats["placements_tried"] += 1
+
             if c1 in grid or c2 in grid:
                 continue
 
@@ -247,7 +272,7 @@ def solve_pips(board):
             removed = forward_check(d)
             if removed is not None:
                 # continue deeper
-                if dfs():
+                if dfs(depth + 1):
                     return True
                 # undo forward checking
                 undo_forward_check(removed)
@@ -260,11 +285,14 @@ def solve_pips(board):
             del grid[c2]
 
         used[d] = False
+        if stats is not None:
+            stats["backtracks"] += 1
         return False
 
 
 
     # start dfs
-    if dfs():
-        return grid
-    return None
+    solved = dfs()
+    if return_stats:
+        return (solution if solved else None, stats)
+    return solution if solved else None
