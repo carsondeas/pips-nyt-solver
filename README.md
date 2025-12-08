@@ -3,7 +3,7 @@ AI solvers for the New York Times **Pips** domino puzzle. The project consists o
 
 ## Features
 - **CSP solver**: backtracking search with domino domain ordering, forward checking, and region-constraints pruning; returns stats (nodes, prunes, backtracks).
-- **Simulated annealing**: random init, overlap/constraint energy, Metropolis acceptance, multiple restarts.
+- **Simulated annealing**: random init, overlap/constraint energy, multiple restarts.
 - **Visualizers**: matplotlib stepper and pygame board player.
 - **Benchmarking**: run both solvers across many boards and save comparison plots.
 - **Data utilities**: fetch NYT Pips JSON boards into `all_boards/`.
