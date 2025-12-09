@@ -55,12 +55,10 @@ python runner.py --solver csp --pygame
   `python runner.py --solver anneal --difficulty hard --repeat 3`
 - Compare both solvers back-to-back on easy:  
   `python runner.py --solver all --difficulty easy --file all_boards/2025-11-14.json`
-- Benchmark stats only (no plotting):  
+- Benchmarks and plots:  
   `python runner.py --stats csp`  
   `python runner.py --stats anneal`  
   `python runner.py --stats compare`
-
-Stat runs use the most recent boards in `all_boards/` (controlled by `DAYS_OF_DATA` in `metrics/csp_benchmark.py` and `metrics/sa_benchmark.py`). Adjust that constant to change how many days of the most recent puzzles are included.
 
 ## Visualizers
 - **Pygame board/player** (grid, constraints, domino tray):  
@@ -70,11 +68,18 @@ Stat runs use the most recent boards in `all_boards/` (controlled by `DAYS_OF_DA
 
 
 ## Benchmarks and plots
+Stat runs use the most recent boards in `all_boards/` (controlled by `DAYS_OF_DATA` in `metrics/csp_benchmark.py` and `metrics/sa_benchmark.py`). 
+Adjust that constant to change how many days of the most recent puzzles are included.
+
 - Full comparison (writes PNGs to `metrics/plots/`):
   `python -m metrics.compare_benchmarks`
 - Single-solver runs:
   `python -m metrics.csp_benchmark`
   `python -m metrics.sa_benchmark`
+- Can also use runner.py --stats [options]:
+  `python runner.py --stats csp`  
+  `python runner.py --stats anneal`  
+  `python runner.py --stats compare`
 
 ## How it works
 - `load_board.py`: reads NYT JSON into `Board`, `Domino`, `Region`.
