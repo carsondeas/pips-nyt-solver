@@ -50,15 +50,15 @@ python runner.py --solver csp --pygame
 
 ## Usage examples
 - CSP on a specific medium board:  
-  `python runner.py --solver csp --difficulty medium --file all_boards/2025-11-14.json`
+  - `python runner.py --solver csp --difficulty medium --file all_boards/2025-11-14.json`
 - Annealing on a random hard board (3 trials averaged):  
-  `python runner.py --solver anneal --difficulty hard --repeat 3`
+  - `python runner.py --solver anneal --difficulty hard --repeat 3`
 - Compare both solvers back-to-back on easy:  
-  `python runner.py --solver all --difficulty easy --file all_boards/2025-11-14.json`
+  - `python runner.py --solver all --difficulty easy --file all_boards/2025-11-14.json`
 - Benchmarks and plots:  
-  `python runner.py --stats csp`  
-  `python runner.py --stats anneal`  
-  `python runner.py --stats compare`
+  - `python runner.py --stats csp`  
+  - `python runner.py --stats anneal`  
+  - `python runner.py --stats compare`
 
 ## Visualizers
 - **Pygame board/player** (grid, constraints, domino tray):  
@@ -72,14 +72,14 @@ Stat runs use the most recent boards in `all_boards/` (controlled by `DAYS_OF_DA
 Adjust that constant to change how many days of the most recent puzzles are included.
 
 - Full comparison (writes PNGs to `metrics/plots/`):
-  `python -m metrics.compare_benchmarks`
+  - `python -m metrics.compare_benchmarks`
 - Single-solver runs:
-  `python -m metrics.csp_benchmark`
-  `python -m metrics.sa_benchmark`
+  - `python -m metrics.csp_benchmark`
+  - `python -m metrics.sa_benchmark`
 - Can also use runner.py --stats [options]:
-  `python runner.py --stats csp`  
-  `python runner.py --stats anneal`  
-  `python runner.py --stats compare`
+  - `python runner.py --stats csp`  
+  - `python runner.py --stats anneal`  
+  - `python runner.py --stats compare`
 
 ## How it works
 - `load_board.py`: reads NYT JSON into `Board`, `Domino`, `Region`.
