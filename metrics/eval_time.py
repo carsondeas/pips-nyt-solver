@@ -16,6 +16,8 @@ from simulated_annealing import solve_pips as solve_pips_sa
 
 ROOT = Path(__file__).resolve().parents[1]
 
+# AI DISCLAIMER: Utilized AI to help with figuring out how to properly
+# get the solver to timeout and continue after 60 seconds.
 
 def _solver_worker(solver_fn, puzzle, conn):
     """Runs inside a subprocess. Sends solution back via pipe."""
@@ -60,7 +62,7 @@ def evaluate_solvers(boards_dir, sample_size=1000):
         print("No boards found.")
         return None
 
-    # sample 50 random boards (or fewer if we don't have 50)
+    # sample random boards
     sample = random.sample(all_files, min(sample_size, len(all_files)))
 
     results = {

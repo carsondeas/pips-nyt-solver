@@ -15,7 +15,7 @@ AI solvers for the New York Times **Pips** domino puzzle. The project consists o
 ## Clone and local setup
 1. Clone the repository:
 ```bash
-git clone https://github.com/your-username/pips-nyt-solver.git
+git clone https://github.com/carsondeas/pips-nyt-solver.git
 ```
 
 2. Navigate to the project directory:
