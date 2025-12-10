@@ -46,12 +46,12 @@ def region_ok_partial(region, values, unused_values):
         return True
 
     
-    # Compute best-case min & max sums using unused values
+    # compute best-case min + max sums using unused values
     all_unused = []
     for val, cnt in unused_values.items():
         all_unused.extend([val] * cnt)
 
-    # If not enough values left globally to fill the region, fail
+    # if not enough values left globally to fill the region, fail
     if len(all_unused) < remaining:
         return False
 
